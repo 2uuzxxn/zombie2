@@ -16,8 +16,8 @@ const BOOST_DURATION = 150;
 const STEEL_TAIL_DURATION = 150;
 
 const ZOMBIE_COUNT = 6;
-const ZOMBIE_SPEED_NORMAL = 5.5;
-const ZOMBIE_SPEED_BOOSTED = 11;
+const ZOMBIE_SPEED_NORMAL = 4.2;    // 하향 조정 (기본 5.5)
+const ZOMBIE_SPEED_BOOSTED = 8.5;   // 하향 조정 (기본 11)
 const ZOMBIE_BLOOD_DURATION = 150;
 const ZOMBIE_RANDOM_CHANCE = 0.03;
 
