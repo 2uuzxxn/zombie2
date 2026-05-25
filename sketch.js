@@ -1,21 +1,20 @@
 const sketch = (p) => {
   p.setup = () => {
-    // 75x75 타일이 한눈에 쏙 들어오는 가로 900px, 세로 900px 전장 생성
-    p.createCanvas(900, 900); 
+    p.createCanvas(900, 900); // 75x75 타일이 쏙 들어가는 900x900 화면 크기
     p.frameRate(60);
     resetGame();
   };
 
   p.draw = () => {
-    // [치명적인 버그 해결 포인트!] 
-    // 화면을 지우는 background 연산이 수행되더라도 타일이 증발하지 않도록 
-    // 매 프레임 렌더링 직전에 전방위 타일의 dirty 신호를 켜서 강제로 화면에 붙박아버립니다.
+    // 1. 화면 전체를 흰색으로 깨끗하게 지웁니다.
+    p.background(255);
+
+    // 2. 그 즉시 하얀 바탕 위에 좀비 땅과 플레이어 땅을 강제로 먼저 칠해버립니다.
     if (grid) {
-      grid.forceRedrawAll(); // 맵 영역이 흰색 배경에 덮어쓰기 당하는 현상 원천 차단!
-      grid.drawGrid(p);      // 이제 플레이어(초록)와 좀비(보라)의 땅이 눈에 항상 보입니다.
+      grid.drawGrid(p); 
     }
 
-    // 게임 메인 세션 루프 및 캐릭터, 아이템 박스 구동
+    // 3. 그 위에 캐릭터들과 아이템 상자를 얹어서 렌더링합니다.
     if (currentPhase === PHASE_GAME) {
       updateGameSession(p);
     } else {
@@ -24,21 +23,18 @@ const sketch = (p) => {
   };
 
   function resetGame() {
-    // 1. 맵 레이아웃(그리드)을 최상위 경로에 새롭게 선언
+    // 맵 그리드 시스템 먼저 로드
     grid = new Grid(75, 75, 12); 
 
-    // 2. 플레이어 진영 및 초록색 팀 베이스라인 영역 초기화
+    // 플레이어 영역 및 초록색 시작 땅 초기화
     initPlayers(); 
 
-    // 3. 좀비들을 생성하고 사방 구석 모서리에 보라색 2x2 좀비 기지를 굳건히 배치
+    // 좀비 스폰 및 발밑에 2x2 보라색 집 생성
     if (typeof initZombies === 'function') {
       initZombies();
     }
-
-    // 4. 세팅이 끝난 첫 프레임부터 맵 전체를 확실하게 렌더링하라고 명령 유도
-    grid.forceRedrawAll();
   }
 };
 
-// p5.js 인스턴스 최종 바인딩 실행 코드
+// p5 인스턴스 최종 구동
 new p5(sketch);
