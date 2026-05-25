@@ -1,174 +1,96 @@
-// ui.js — HUD, 타이머 바, 결과 화면, 알림
+// tile.js — 아이템 박스(타일) 생성, 관리 및 획득 처리
 
-let notifications = [];
+let tiles = [];
 
-function showNotification(playerId, msg, color) {
-  notifications.push({ playerId, msg, color, timer: 120 });
-  if (notifications.length > 3) notifications.shift();
+function initTiles(p) {
+  tiles = [];
+  spawnTiles(p);
 }
 
-function drawUI(p, phase, timeLeft, counts) {
+function spawnTiles(p) {
+  const types = [BOX_TYPE_MEDICINE, BOX_TYPE_BLOOD, BOX_TYPE_ENERGY];
+  
+  for (let type of types) {
+    for (let i = 0; i < BOX_COUNT_EACH; i++) {
+      let r, c;
+      // 안전한 빈 공간에 아이템 스폰 (좀비 기지나 플레이어 시작 땅 피해 생성)
+      let attempts = 0;
+      do {
+        r = Math.floor(p.random(2, ROWS - 2));
+        c = Math.floor(p.random(2, COLS - 2));
+        attempts++;
+      } while (getOwner(r, c) !== OWNER_NONE && attempts < 100);
+
+      tiles.push({ r, c, type });
+    }
+  }
+}
+
+function updateTiles(p) {
+  // 아이템이 모두 먹혔을 때 재스폰 규칙 등을 원하시면 추가할 수 있습니다.
+  if (tiles.length === 0) {
+    spawnTiles(p);
+  }
+}
+
+function drawTiles(p) {
   p.push();
-  p.textFont('monospace');
-
-  const hudH = 40;
-  p.noStroke(); p.fill(0, 0, 0, 210);
-  p.rect(0, 0, CANVAS_W, hudH);
-
-  const totalTiles = ROWS * COLS;
-  const barX = 10, barY = 26, barW = CANVAS_W-20, barH = 8;
-
-  // ── 영역 비율 바 ──
-  p.fill(40); p.rect(barX, barY, barW, barH, 5);
-  if (phase === PHASE_COOP || phase === PHASE_SOLO) {
-    const w = Math.max(2, (counts.team / totalTiles) * barW);
-    p.fill(COLOR_TEAM); p.rect(barX, barY, w, barH, 5);
-  } else {
-    const wA = Math.max(0, (counts.A / totalTiles) * barW);
-    const wB = Math.max(0, (counts.B / totalTiles) * barW);
-    if (wA > 0) { p.fill(COLOR_A); p.rect(barX, barY, wA, barH, 5,0,0,5); }
-    if (wB > 0) { p.fill(COLOR_B); p.rect(barX+barW-wB, barY, wB, barH, 0,5,5,0); }
-    p.fill(COLOR_A); p.textSize(10); p.textAlign(p.LEFT, p.CENTER);
-    p.text(`A: ${counts.A}`, barX, 14);
-    p.fill(COLOR_B); p.textAlign(p.RIGHT, p.CENTER);
-    p.text(`B: ${counts.B}`, barX+barW, 14);
+  for (let t of tiles) {
+    const x = t.c * TILE_SIZE;
+    const y = t.r * TILE_SIZE;
+    
+    p.strokeWeight(1);
+    p.stroke(255, 200);
+    
+    if (t.type === BOX_TYPE_MEDICINE) {
+      p.fill('#26A69A'); // 약: 민트색/초록빛
+      p.rect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
+      p.fill(255); p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
+      p.text('💊', x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+    } 
+    else if (t.type === BOX_TYPE_BLOOD) {
+      p.fill('#D32F2F'); // 피: 빨간색
+      p.rect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
+      p.fill(255); p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
+      p.text('🩸', x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+    } 
+    else if (t.type === BOX_TYPE_ENERGY) {
+      p.fill('#FFB300'); // 에너지드링크: 주황/노란색
+      p.rect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
+      p.fill(255); p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
+      p.text('⚡', x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+    }
   }
-
-  // ── 타임바 (남은 시간, 상단 4px 바 1개) ──
-  const totalTime = (phase === PHASE_SOLO) ? SOLO_TIME_LIMIT
-                  : (phase === PHASE_BETRAYAL || betrayalTriggered) ? EMERGENCY_BETRAYAL_TIME
-                  : GAME_TOTAL_TIME;
-  const timeFraction = Math.max(0, Math.min(1, timeLeft / GAME_TOTAL_TIME));
-  // 배경
-  p.noStroke(); p.fill(50);
-  p.rect(0, hudH, CANVAS_W, 5);
-  // 남은 시간 바
-  const barColor = timeFraction > 0.4 ? '#4CAF50' : timeFraction > 0.15 ? '#FF9800' : '#F44336';
-  p.fill(barColor);
-  p.rect(0, hudH, CANVAS_W * timeFraction, 5);
-
-  // ── 타이머 텍스트 ──
-  const mins = Math.floor(timeLeft/60);
-  const secs = Math.floor(timeLeft%60);
-  const timeStr = `${mins}:${secs.toString().padStart(2,'0')}`;
-  p.textAlign(p.CENTER, p.CENTER);
-  if (phase === PHASE_BETRAYAL) {
-    p.fill(timeLeft < 10 ? (p.frameCount%10<5?'#FF1744':'#FF8A80') : '#FF5252');
-    p.textSize(15); p.text(`⚠ 배신 ${timeStr} ⚠`, CANVAS_W/2, 13);
-  } else if (phase === PHASE_SOLO) {
-    p.fill('#FF9800'); p.textSize(14);
-    p.text(`⏱ 제한 ${timeStr}`, CANVAS_W/2, 13);
-  } else {
-    p.fill(220); p.textSize(13);
-    p.text(timeStr, CANVAS_W/2, 13);
-  }
-
-  // ── 페이즈 라벨 ──
-  p.textSize(9); p.textAlign(p.CENTER, p.BOTTOM);
-  if (phase === PHASE_COOP)     { p.fill('#4CAF50'); p.text('[ 협력 페이즈 ]', CANVAS_W/2, 38); }
-  else if (phase === PHASE_SOLO){ p.fill('#FF9800'); p.text('[ 한 명 사망 — 제한시간! ]', CANVAS_W/2, 38); }
-  else if (phase === PHASE_BETRAYAL){ p.fill('#FF5252'); p.text('[ 배신 페이즈 — 팀원도 적! ]', CANVAS_W/2, 38); }
-
-  // 배신 페이즈 테두리
-  if (phase === PHASE_BETRAYAL) {
-    const alpha = 80 + Math.sin(p.frameCount*0.1)*40;
-    p.noFill(); p.stroke(255,50,50,alpha); p.strokeWeight(6);
-    p.rect(3,3,CANVAS_W-6,CANVAS_H-6,2); p.noStroke();
-  }
-
-  // 플레이어 상태
-  _drawPlayerStatus(p, playerA, 10, hudH+10, 'A');
-  _drawPlayerStatus(p, playerB, CANVAS_W-10, hudH+10, 'B');
-
-  // 좀비 피 효과
-  if (zombieBloodTimer > 0) {
-    p.fill('#E53935'); p.textSize(10); p.textAlign(p.CENTER, p.TOP);
-    p.text(`🩸 좀비 가속 ${Math.ceil(zombieBloodTimer/FRAME_RATE)}초`, CANVAS_W/2, hudH+10);
-  }
-
-  _drawNotifications(p);
   p.pop();
 }
 
-function _drawPlayerStatus(p, player, x, y, label) {
-  if (!player) return;
-  p.textSize(10); p.noStroke();
-  const icons = [];
-  if (player.boostTimer > 0) icons.push(`⚡${Math.ceil(player.boostTimer/FRAME_RATE)}s`);
-  if (player.steelTailTimer > 0) icons.push(`🛡${Math.ceil(player.steelTailTimer/FRAME_RATE)}s`);
-  p.fill(label==='A' ? COLOR_A : COLOR_B);
-  p.textAlign(label==='A' ? p.LEFT : p.RIGHT, p.TOP);
-  p.text(`P${label} ${!player.alive?'💀':'●'} ${icons.join(' ')}`, x, y);
-}
+function checkTilePickup(player, zombiesArr, phase, p) {
+  if (!player.alive) return;
 
-function _drawNotifications(p) {
-  for (let i = notifications.length-1; i >= 0; i--) {
-    const n = notifications[i];
-    n.timer--;
-    if (n.timer <= 0) { notifications.splice(i,1); continue; }
-    const alpha = Math.min(255, n.timer*3);
-    const yPos = CANVAS_H - 30 - (notifications.length-1-i)*24;
-    p.noStroke(); p.fill(0,0,0,alpha*0.7);
-    p.rect(10, yPos-10, CANVAS_W-20, 20, 4);
-    const c = p.color(n.color);
-    p.fill(p.red(c), p.green(c), p.blue(c), alpha);
-    p.textSize(11); p.textAlign(p.CENTER, p.CENTER);
-    p.text(n.msg, CANVAS_W/2, yPos);
+  for (let i = tiles.length - 1; i >= 0; i--) {
+    let t = tiles[i];
+    if (player.r === t.r && player.c === t.c) {
+      // 아이템 획득 이벤트 처리
+      if (t.type === BOX_TYPE_MEDICINE) {
+        // 💊 약: 획득자 진영의 폭탄 투하 효과 (보너스 땅 자동 점령)
+        applyAreaBomb(t.r, t.c, player.owner);
+        player.bombFlash = 15;
+        showNotification(player.id, `P${player.id}가 약(💊)을 먹어 주변을 점령했습니다!`, '#26A69A');
+      } 
+      else if (t.type === BOX_TYPE_BLOOD) {
+        // 🩸 피: 모든 좀비 일시 폭주 및 속도 가속
+        zombieBloodTimer = ZOMBIE_BLOOD_DURATION;
+        showNotification(player.id, `🚨 경고: 피(🩸) 오염으로 좀비들이 폭주합니다!`, '#D32F2F');
+      } 
+      else if (t.type === BOX_TYPE_ENERGY) {
+        // ⚡ 에너지드링크: 플레이어 가속 및 일정 시간 강철꼬리(무적) 부여
+        player.boostTimer = BOOST_DURATION;
+        player.steelTailTimer = STEEL_TAIL_DURATION;
+        showNotification(player.id, `P${player.id} 에너지드링크(⚡) 장착! 폭주 및 강철꼬리!`, '#FFB300');
+      }
+      
+      // 획득한 아이템 삭제
+      tiles.splice(i, 1);
+    }
   }
-}
-
-function drawResultScreen(p, counts, winner) {
-  p.fill(0,0,0,200); p.noStroke(); p.rect(0,0,CANVAS_W,CANVAS_H);
-  const cx=CANVAS_W/2, cy=CANVAS_H/2;
-  p.fill(20,20,30,240); p.stroke(80); p.strokeWeight(1);
-  p.rect(cx-200, cy-130, 400, 270, 12);
-  p.noStroke(); p.textAlign(p.CENTER, p.CENTER);
-  p.textSize(22); p.fill(255); p.text('게임 종료', cx, cy-100);
-  p.textSize(26);
-  if (winner==='A')      { p.fill(COLOR_A); p.text('플레이어 A 승리! 🏆', cx, cy-58); }
-  else if (winner==='B') { p.fill(COLOR_B); p.text('플레이어 B 승리! 🏆', cx, cy-58); }
-  else if (winner==='draw') { p.fill('#FFD600'); p.text('무승부!', cx, cy-58); }
-  else { p.fill('#AB47BC'); p.text('좀비의 승리... 😱', cx, cy-58); }
-  p.textSize(14);
-  p.fill(COLOR_A); p.text(`A 영역: ${counts.A} 타일`, cx, cy-15);
-  p.fill(COLOR_B); p.text(`B 영역: ${counts.B} 타일`, cx, cy+10);
-  p.fill(50,50,70); p.stroke(120); p.strokeWeight(1);
-  p.rect(cx-80, cy+58, 160, 38, 8);
-  p.noStroke(); p.fill(200); p.textSize(14);
-  p.text('다시 시작 (R)', cx, cy+78);
-}
-
-let betrayalAnnounceFade = 0;
-function showBetrayalAnnounce(p) { betrayalAnnounceFade = 90; }
-function drawBetrayalAnnounce(p) {
-  if (betrayalAnnounceFade <= 0) return;
-  betrayalAnnounceFade--;
-  const alpha = Math.min(255, betrayalAnnounceFade*4);
-  p.fill(200,0,0,alpha); p.noStroke();
-  p.rect(0, CANVAS_H/2-45, CANVAS_W, 90);
-  p.fill(255,255,255,alpha); p.textAlign(p.CENTER, p.CENTER);
-  p.textSize(26); p.text('⚠ 배신 타이머 발동! ⚠', CANVAS_W/2, CANVAS_H/2-12);
-  p.textSize(13); p.text('이제 팀원도 적입니다', CANVAS_W/2, CANVAS_H/2+18);
-}
-
-function drawLobby(p) {
-  p.background(10,10,15);
-  const cx=CANVAS_W/2, cy=CANVAS_H/2;
-  p.textAlign(p.CENTER, p.CENTER);
-  p.textSize(36); p.fill('#4CAF50'); p.text('좀비 영역 전쟁', cx, cy-160);
-  p.textSize(13); p.fill(180); p.text('2인 협력 → 배신 영역 점령 게임', cx, cy-118);
-  p.textSize(12);
-  p.fill(COLOR_A); p.text('플레이어 A: W A S D', cx-120, cy-72);
-  p.fill(COLOR_B); p.text('플레이어 B: ↑ ↓ ← →', cx+120, cy-72);
-  p.textSize(11); p.fill(160);
-  p.text('협력 페이즈 40초 → 배신 페이즈 20초', cx, cy-38);
-  p.text('상대 꼬리를 끊어야 죽음 / 머리끼리 부딪히면 밀려남', cx, cy-18);
-  p.text('맵 밖으로 나갈 수 없음', cx, cy+2);
-  p.fill(255,165,0);
-  p.text('💊 약: 보너스 땅   🩸 피: 좀비 가속   ⚡ 에너지드링크: 속도2배+강철꼬리', cx, cy+32);
-  p.fill(180); p.text('좀비 꼬리를 밟으면 좀비가 죽습니다!', cx, cy+52);
-  const blink = Math.floor(p.frameCount/20)%2===0;
-  p.fill(blink?'#4CAF50':'#2E7D32'); p.noStroke();
-  p.rect(cx-100, cy+80, 200, 46, 10);
-  p.fill(255); p.textSize(15); p.text('시작하기 (SPACE)', cx, cy+104);
 }
