@@ -53,16 +53,18 @@ function tileColor(owner) {
   }
 }
 
-// BFS flood fill: 꼬리로 둘러싸인 내부 빈 타일을 owner로 채움
+// ── [핵심 수정] 이제 플레이어뿐만 아니라 좀비 진영도 안쪽 영역을 채울 수 있도록 알고리즘 개선 ──
 function floodFillEnclosed(tailSet, owner, p) {
   const visited = new Set();
   const queue = [];
 
+  // 외곽 경계선에서 탐색 시작
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (r === 0 || r === ROWS-1 || c === 0 || c === COLS-1) {
         const key = `${r},${c}`;
-        if (!tailSet.has(key) && grid[r][c].owner === OWNER_NONE && !visited.has(key)) {
+        // 현재 채우려는 주인의 땅(owner)이나 움직이는 꼬리(tailSet)가 '아닌' 모든 공간을 외부로 취급
+        if (!tailSet.has(key) && grid[r][c].owner !== owner && !visited.has(key)) {
           visited.add(key);
           queue.push([r, c]);
         }
@@ -78,20 +80,24 @@ function floodFillEnclosed(tailSet, owner, p) {
       if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
       const key = `${nr},${nc}`;
       if (visited.has(key) || tailSet.has(key)) continue;
-      if (grid[nr][nc].owner !== OWNER_NONE) continue;
+      // 외부에서 타고 들어갈 때, 내 땅(owner)을 만나면 막힘
+      if (grid[nr][nc].owner === owner) continue;
       visited.add(key);
       queue.push([nr, nc]);
     }
   }
 
+  // 꼬리 흔적을 내 땅으로 확정 변경
   for (const key of tailSet) {
     const [r, c] = key.split(',').map(Number);
     setOwner(r, c, owner);
   }
+  
+  // 외부 탐색(visited)에 걸리지 않은 '갇힌 내부 공간'을 내 땅으로 전부 채우기!
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const key = `${r},${c}`;
-      if (grid[r][c].owner === OWNER_NONE && !visited.has(key) && !tailSet.has(key)) {
+      if (!visited.has(key) && !tailSet.has(key)) {
         setOwner(r, c, owner);
       }
     }
