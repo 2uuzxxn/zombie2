@@ -67,21 +67,21 @@ class Zombie {
       return;
     }
 
-    // 좀비 영역 점령 및 꼬리 관리 시스템
+    // ── 좀비 영역 점령 및 꼬리 관리 시스템 ──
     const isOnOwned = getOwner(this.r, this.c) === OWNER_ZOMBIE;
     if (isOnOwned) {
+      // 좀비가 자신의 보라색 영역으로 돌아왔을 때 영역 안쪽을 굳히는 채우기 로직 실행!
       if (this.tail.length > 0) {
         const tailSet = new Set(this.tail.map(t => `${t.r},${t.c}`));
         floodFillEnclosed(tailSet, OWNER_ZOMBIE, null);
         this.tail = [];
       }
     } else {
+      // 자기 영역 밖에서는 꼬리(줄) 흔적을 남김
       this.tail.push({ r: this.r, c: this.c });
       
-      // 좀비가 빈 땅(OWNER_NONE)을 지나갈 때는 즉시 좀비 땅으로 칠하면서 전진!
-      if (getOwner(this.r, this.c) === OWNER_NONE) {
-        setOwner(this.r, this.c, OWNER_ZOMBIE);
-      }
+      // [영역 점령 강화] 좀비가 지나갈 때 빈 땅뿐만 아니라 플레이어들의 땅(팀, A, B)도 전부 침식하여 좀비 땅으로 강제 정복!
+      setOwner(this.r, this.c, OWNER_ZOMBIE);
     }
 
     // 플레이어 꼬리(줄) 끊기
@@ -144,7 +144,6 @@ function initZombies() {
   zombieBloodTimer = 0;
   zombieSpawnTimer = 0;
 
-  // ── [버그 수정] 좌표 연산에 안전한 Math.floor를 사용하여 온전한 숫자 데이터 배열 생성 ──
   const midR = Math.floor(ROWS / 2);
   const midC = Math.floor(COLS / 2);
   
@@ -157,7 +156,6 @@ function initZombies() {
     [3, midC]
   ];
   
-  // 좀비 생성 및 집(보라색 영역 3x3) 강제 생성
   for (let i = 0; i < Math.min(ZOMBIE_COUNT, pos.length); i++) {
     const startR = pos[i][0];
     const startC = pos[i][1];
@@ -203,10 +201,6 @@ function _spawnZombie(p) {
   
   zombies.push(new Zombie(zR, zC));
   setOwner(zR, zC, OWNER_ZOMBIE);
-}
-
-function drawZombies(p) {
-  for (const z of zombies) z.draw(p);
 }
 
 function drawZombies(p) {
