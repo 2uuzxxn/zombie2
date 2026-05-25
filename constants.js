@@ -1,5 +1,3 @@
-// constants.js — 게임 상수 정의
-
 const TILE_SIZE = 18;
 const COLS = 50;
 const ROWS = 50;
@@ -18,9 +16,8 @@ const BOOST_DURATION = 150;
 const STEEL_TAIL_DURATION = 150;
 
 const ZOMBIE_COUNT = 6;
-// ── [밸런스 수정] 좀비 속도 하향 조절 ──
-const ZOMBIE_SPEED_NORMAL = 4.0;    // 기존 5.5에서 4.0으로 감소
-const ZOMBIE_SPEED_BOOSTED = 8.0;   // 기존 11에서 8.0으로 감소
+const ZOMBIE_SPEED_NORMAL = 5.5;
+const ZOMBIE_SPEED_BOOSTED = 11;
 const ZOMBIE_BLOOD_DURATION = 150;
 const ZOMBIE_RANDOM_CHANCE = 0.03;
 
