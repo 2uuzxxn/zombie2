@@ -1,10 +1,11 @@
 // constants.js — 게임 상수 정의
 
-const TILE_SIZE = 18;
-const COLS = 50;
-const ROWS = 50;
-const CANVAS_W = COLS * TILE_SIZE;
-const CANVAS_H = ROWS * TILE_SIZE;
+// ── [최적화 & 대규모 패치] 타일 개수 확장 및 크기 조정 ──
+const TILE_SIZE = 12;              // 타일 개수가 늘어난 만큼 화면 크기에 맞게 조정 (기존 18)
+const COLS = 75;                   // 가로 타일 개수 (기존 50)
+const ROWS = 75;                   // 세로 타일 개수 (기존 50)
+const CANVAS_W = COLS * TILE_SIZE; // 전체 화면 가로 폭 (900 픽셀)
+const CANVAS_H = ROWS * TILE_SIZE; // 전체 화면 세로 높이 (900 픽셀)
 
 const GAME_TOTAL_TIME = 60;        // 전체 게임 시간 1분
 const BETRAYAL_TRIGGER_TIME = 20;  // 배신 타이머 발동 잔여 시간 20초
@@ -18,14 +19,13 @@ const BOOST_DURATION = 150;
 const STEEL_TAIL_DURATION = 150;
 
 const ZOMBIE_COUNT = 6;
-// ── [밸런스 수정] 좀비 속도 하향 조절 ──
-const ZOMBIE_SPEED_NORMAL = 4.0;    // 기존 5.5에서 4.0으로 감소
-const ZOMBIE_SPEED_BOOSTED = 8.0;   // 기존 11에서 8.0으로 감소
+const ZOMBIE_SPEED_NORMAL = 4.0;    // 저사양 PC를 배려해 하향된 속도 유지
+const ZOMBIE_SPEED_BOOSTED = 8.0;
 const ZOMBIE_BLOOD_DURATION = 150;
 const ZOMBIE_RANDOM_CHANCE = 0.03;
 
-const BOX_COUNT_EACH = 3;
-const BOMB_RADIUS = 3;
+const BOX_COUNT_EACH = 4;           // 맵이 넓어진 만큼 아이템 상자 개수 추가 (기존 3)
+const BOMB_RADIUS = 4;              // 맵이 넓어진 만큼 폭탄 범위 상향 (기존 3)
 
 const OWNER_NONE = null;
 const OWNER_TEAM = 'team';
