@@ -1,9 +1,11 @@
-// grid.js — 게임판 관리
+// grid.js — 게임판 관리 및 저사양 PC 최적화 렌더링
 
 let grid = [];
+let isFirstRender = true; // 게임 시작 시 전체 화면을 한 번 그리기 위한 플래그
 
 function initGrid() {
   grid = [];
+  isFirstRender = true; // 리셋 시 첫 렌더링 플래그 초기화
   for (let r = 0; r < ROWS; r++) {
     grid[r] = [];
     for (let c = 0; c < COLS; c++) {
@@ -16,7 +18,7 @@ function setOwner(r, c, owner) {
   if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
   if (grid[r][c].owner !== owner) {
     grid[r][c].owner = owner;
-    grid[r][c].dirty = true;
+    grid[r][c].dirty = true; // ── [최적화] 땅 주인이 바뀌었을 때만 그리도록 마킹 ──
   }
 }
 
@@ -25,22 +27,33 @@ function getOwner(r, c) {
   return grid[r][c].owner;
 }
 
+// ── [저사양 최적화 버전] drawGrid 함수 대폭 개조 ──
 function drawGrid(p) {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const tile = grid[r][c];
-      const x = c * TILE_SIZE;
-      const y = r * TILE_SIZE;
-      p.fill(tileColor(tile.owner));
-      p.noStroke();
-      p.rect(x, y, TILE_SIZE, TILE_SIZE);
-      p.stroke(COLOR_GRID);
-      p.strokeWeight(0.3);
-      p.noFill();
-      p.rect(x, y, TILE_SIZE, TILE_SIZE);
-      tile.dirty = false;
+      
+      // 첫 렌더링이거나, 타일에 변화가 생겼을 때만(dirty === true) 그림을 새로 그립니다.
+      if (isFirstRender || tile.dirty) {
+        const x = c * TILE_SIZE;
+        const y = r * TILE_SIZE;
+        
+        // 타일 내부 색상 칠하기
+        p.fill(tileColor(tile.owner));
+        p.noStroke();
+        p.rect(x, y, TILE_SIZE, TILE_SIZE);
+        
+        // 격자 테두리 선 칠하기
+        p.stroke(COLOR_GRID);
+        p.strokeWeight(0.2); // 타일이 작아진 만큼 격자 선도 얇게 최적화
+        p.noFill();
+        p.rect(x, y, TILE_SIZE, TILE_SIZE);
+        
+        tile.dirty = false; // 렌더링이 끝났으므로 마킹 해제
+      }
     }
   }
+  isFirstRender = false; // 첫 프레임 전체 렌더링 완료
 }
 
 function tileColor(owner) {
@@ -53,17 +66,15 @@ function tileColor(owner) {
   }
 }
 
-// ── [핵심 수정] 이제 플레이어뿐만 아니라 좀비 진영도 안쪽 영역을 채울 수 있도록 알고리즘 개선 ──
+// 좀비와 플레이어 공용 내부 영역 채우기 알고리즘
 function floodFillEnclosed(tailSet, owner, p) {
   const visited = new Set();
   const queue = [];
 
-  // 외곽 경계선에서 탐색 시작
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       if (r === 0 || r === ROWS-1 || c === 0 || c === COLS-1) {
         const key = `${r},${c}`;
-        // 현재 채우려는 주인의 땅(owner)이나 움직이는 꼬리(tailSet)가 '아닌' 모든 공간을 외부로 취급
         if (!tailSet.has(key) && grid[r][c].owner !== owner && !visited.has(key)) {
           visited.add(key);
           queue.push([r, c]);
@@ -80,20 +91,16 @@ function floodFillEnclosed(tailSet, owner, p) {
       if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
       const key = `${nr},${nc}`;
       if (visited.has(key) || tailSet.has(key)) continue;
-      // 외부에서 타고 들어갈 때, 내 땅(owner)을 만나면 막힘
       if (grid[nr][nc].owner === owner) continue;
       visited.add(key);
       queue.push([nr, nc]);
     }
   }
 
-  // 꼬리 흔적을 내 땅으로 확정 변경
   for (const key of tailSet) {
     const [r, c] = key.split(',').map(Number);
     setOwner(r, c, owner);
   }
-  
-  // 외부 탐색(visited)에 걸리지 않은 '갇힌 내부 공간'을 내 땅으로 전부 채우기!
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       const key = `${r},${c}`;
@@ -104,7 +111,6 @@ function floodFillEnclosed(tailSet, owner, p) {
   }
 }
 
-// Voronoi 분할: 배신 시 팀 영역을 두 플레이어 위치 기준으로 분할
 function voronoiSplit(posA, posB) {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -138,7 +144,7 @@ function applyAreaBomb(centerR, centerC, owner) {
     for (let c = centerC-BOMB_RADIUS; c <= centerC+BOMB_RADIUS; c++) {
       if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue;
       if (Math.abs(r-centerR)+Math.abs(c-centerC) <= BOMB_RADIUS) {
-        if (grid[r][c].owner === OWNER_NONE) setOwner(r, c, owner);
+        setOwner(r, c, owner); // 아이템을 먹었을 때도 주인이 바뀌므로 내부에서 dirty 처리가 자동으로 됨
       }
     }
   }
