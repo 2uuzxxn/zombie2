@@ -1,4 +1,5 @@
-// player.js — 플레이어 이동, 꼬리, 충돌 판정
+
+  // player.js — 플레이어 이동, 꼬리, 충돌 판정
 
 class Player {
   constructor(id, startR, startC, keyUp, keyDown, keyLeft, keyRight, initDr, initDc) {
