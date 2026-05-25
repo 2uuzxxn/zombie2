@@ -1,96 +1,96 @@
-// tile.js — 아이템 박스(타일) 생성, 관리 및 획득 처리
+// tile.js — 랜덤 박스 3종 (게임 시작 시 맵에 고정 배치)
+// 박스 크기: 픽셀 4칸 (2x2 타일) → 플레이어가 근처 2칸 이내면 획득
 
-let tiles = [];
+let boxes = [];
 
 function initTiles(p) {
-  tiles = [];
-  spawnTiles(p);
+  boxes = [];
+  _placeBoxes(p);
 }
 
-function spawnTiles(p) {
+function _placeBoxes(p) {
   const types = [BOX_TYPE_MEDICINE, BOX_TYPE_BLOOD, BOX_TYPE_ENERGY];
-  
-  for (let type of types) {
-    for (let i = 0; i < BOX_COUNT_EACH; i++) {
-      let r, c;
-      // 안전한 빈 공간에 아이템 스폰 (좀비 기지나 플레이어 시작 땅 피해 생성)
-      let attempts = 0;
-      do {
-        r = Math.floor(p.random(2, ROWS - 2));
-        c = Math.floor(p.random(2, COLS - 2));
-        attempts++;
-      } while (getOwner(r, c) !== OWNER_NONE && attempts < 100);
-
-      tiles.push({ r, c, type });
+  const midR = Math.floor(ROWS/2);
+  const midC = Math.floor(COLS/2);
+  for (const type of types) {
+    let placed = 0, attempts = 0;
+    while (placed < BOX_COUNT_EACH && attempts < 300) {
+      attempts++;
+      const r = Math.floor(p.random(5, ROWS-5));
+      const c = Math.floor(p.random(5, COLS-5));
+      // 시작 중앙 영역 근처 제외
+      if (Math.abs(r-midR) < 7 && Math.abs(c-midC) < 9) continue;
+      // 다른 박스와 최소 4타일 간격
+      if (boxes.some(b => Math.abs(b.r-r) < 4 && Math.abs(b.c-c) < 4)) continue;
+      boxes.push({ r, c, type });
+      placed++;
     }
   }
 }
 
-function updateTiles(p) {
-  // 아이템이 모두 먹혔을 때 재스폰 규칙 등을 원하시면 추가할 수 있습니다.
-  if (tiles.length === 0) {
-    spawnTiles(p);
-  }
-}
+function updateTiles(p) {}
 
 function drawTiles(p) {
-  p.push();
-  for (let t of tiles) {
-    const x = t.c * TILE_SIZE;
-    const y = t.r * TILE_SIZE;
-    
-    p.strokeWeight(1);
-    p.stroke(255, 200);
-    
-    if (t.type === BOX_TYPE_MEDICINE) {
-      p.fill('#26A69A'); // 약: 민트색/초록빛
-      p.rect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
-      p.fill(255); p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
-      p.text('💊', x + TILE_SIZE / 2, y + TILE_SIZE / 2);
-    } 
-    else if (t.type === BOX_TYPE_BLOOD) {
-      p.fill('#D32F2F'); // 피: 빨간색
-      p.rect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
-      p.fill(255); p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
-      p.text('🩸', x + TILE_SIZE / 2, y + TILE_SIZE / 2);
-    } 
-    else if (t.type === BOX_TYPE_ENERGY) {
-      p.fill('#FFB300'); // 에너지드링크: 주황/노란색
-      p.rect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 3);
-      p.fill(255); p.noStroke(); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
-      p.text('⚡', x + TILE_SIZE / 2, y + TILE_SIZE / 2);
+  for (const box of boxes) {
+    // 박스를 2x2 타일 크기(픽셀 4칸)로 그리기
+    const x = box.c * TILE_SIZE - TILE_SIZE/2;
+    const y = box.r * TILE_SIZE - TILE_SIZE/2;
+    const size = TILE_SIZE * 2; // 2배 크기
+    const blink = Math.sin(p.frameCount * 0.12) > 0;
+
+    p.noStroke();
+    switch (box.type) {
+      case BOX_TYPE_MEDICINE: p.fill(blink ? '#43A047' : '#2E7D32'); break;
+      case BOX_TYPE_BLOOD:    p.fill(blink ? '#E53935' : '#B71C1C'); break;
+      case BOX_TYPE_ENERGY:   p.fill(blink ? '#FFD600' : '#F9A825'); break;
     }
+    p.rect(x+1, y+1, size-2, size-2, 6);
+
+    // 아이콘 (2배 크기에 맞게)
+    p.textAlign(p.CENTER, p.CENTER);
+    p.textSize(16);
+    p.fill(255);
+    let icon = '';
+    switch (box.type) {
+      case BOX_TYPE_MEDICINE: icon = '💊'; break;
+      case BOX_TYPE_BLOOD:    icon = '🩸'; break;
+      case BOX_TYPE_ENERGY:   icon = '⚡'; break;
+    }
+    p.text(icon, x + size/2, y + size/2);
   }
-  p.pop();
 }
 
+// 플레이어가 박스 중심 2칸 이내면 획득 (넉넉한 판정)
 function checkTilePickup(player, zombiesArr, phase, p) {
-  if (!player.alive) return;
+  for (let i = boxes.length-1; i >= 0; i--) {
+    const box = boxes[i];
+    const dist = Math.abs(box.r - player.r) + Math.abs(box.c - player.c);
+    if (dist <= 1) { // 1타일 이내면 획득
+      _applyBoxEffect(box, player, phase, p);
+      boxes.splice(i, 1);
+    }
+  }
+}
 
-  for (let i = tiles.length - 1; i >= 0; i--) {
-    let t = tiles[i];
-    if (player.r === t.r && player.c === t.c) {
-      // 아이템 획득 이벤트 처리
-      if (t.type === BOX_TYPE_MEDICINE) {
-        // 💊 약: 획득자 진영의 폭탄 투하 효과 (보너스 땅 자동 점령)
-        applyAreaBomb(t.r, t.c, player.owner);
-        player.bombFlash = 15;
-        showNotification(player.id, `P${player.id}가 약(💊)을 먹어 주변을 점령했습니다!`, '#26A69A');
-      } 
-      else if (t.type === BOX_TYPE_BLOOD) {
-        // 🩸 피: 모든 좀비 일시 폭주 및 속도 가속
-        zombieBloodTimer = ZOMBIE_BLOOD_DURATION;
-        showNotification(player.id, `🚨 경고: 피(🩸) 오염으로 좀비들이 폭주합니다!`, '#D32F2F');
-      } 
-      else if (t.type === BOX_TYPE_ENERGY) {
-        // ⚡ 에너지드링크: 플레이어 가속 및 일정 시간 강철꼬리(무적) 부여
-        player.boostTimer = BOOST_DURATION;
-        player.steelTailTimer = STEEL_TAIL_DURATION;
-        showNotification(player.id, `P${player.id} 에너지드링크(⚡) 장착! 폭주 및 강철꼬리!`, '#FFB300');
-      }
-      
-      // 획득한 아이템 삭제
-      tiles.splice(i, 1);
+function _applyBoxEffect(box, player, phase, p) {
+  switch (box.type) {
+    case BOX_TYPE_MEDICINE: {
+      const owner = phase === PHASE_COOP ? OWNER_TEAM : player.owner;
+      applyAreaBomb(player.r, player.c, owner);
+      player.bombFlash = 20;
+      showNotification(player.id, '약 획득: 보너스 땅이 주어지는 약을 먹었다!', '#43A047');
+      break;
+    }
+    case BOX_TYPE_BLOOD: {
+      zombieBloodTimer = ZOMBIE_BLOOD_DURATION;
+      showNotification(player.id, '피 획득: 피를 밟았다 좀비속도가 이제 빨라진다!', '#E53935');
+      break;
+    }
+    case BOX_TYPE_ENERGY: {
+      player.boostTimer = BOOST_DURATION;
+      player.steelTailTimer = STEEL_TAIL_DURATION;
+      showNotification(player.id, '에너지드링크 획득: 속도와 강철꼬리를 갖는 에너지드링크를 마셨다!', '#FFD600');
+      break;
     }
   }
 }
