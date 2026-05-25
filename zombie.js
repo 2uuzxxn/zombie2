@@ -143,6 +143,17 @@ class Zombie {
 
 let zombies = [];
 
+// 좀비 전용 2x2 초기 영역 생성 함수 [cite: 7]
+function createZombieInitialArea(startR, startC) {
+  for (let r = startR; r < startR + 2; r++) {
+    for (let c = startC; c < startC + 2; c++) {
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+        setOwner(r, c, OWNER_ZOMBIE);
+      }
+    }
+  }
+}
+
 function initZombies() {
   zombies = [];
   zombieBloodTimer = 0;
@@ -151,7 +162,10 @@ function initZombies() {
     [3,3],[3,COLS-4],[ROWS-4,3],[ROWS-4,COLS-4],[ROWS/2|0,3],[3,COLS/2|0]
   ];
   for (let i = 0; i < Math.min(ZOMBIE_COUNT, pos.length); i++) {
-    zombies.push(new Zombie(pos[i][0], pos[i][1]));
+    const r = pos[i][0];
+    const c = pos[i][1];
+    zombies.push(new Zombie(r, c));
+    createZombieInitialArea(r, c); // 스폰 시 2x2 초기 영역 생성 [cite: 6]
   }
 }
 
@@ -183,6 +197,7 @@ function _spawnZombie(p) {
   ];
   const pos = corners[Math.floor(p.random(corners.length))];
   zombies.push(new Zombie(pos[0], pos[1]));
+  createZombieInitialArea(pos[0], pos[1]); // 추가 스폰 시에도 2x2 초기 영역 생성 [cite: 6]
 }
 
 function drawZombies(p) {
