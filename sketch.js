@@ -1,96 +1,177 @@
-const sketch = (p) => {
-  p.setup = () => {
-    p.createCanvas(900, 900);
-    p.frameRate(60);
-    resetGame();
-  };
+// sketch.js — 게임의 심장
 
-  p.draw = () => {
-    // 1. 화면 초기화
-    p.background(255);
+let phase = PHASE_LOBBY;
+let gameTimer = 0;
+let betrayalTriggered = false;
+let winner = null;
+let soloTimer = 0;
+let deadPlayerId = null;
 
-    // 2. 오리지널 전체 렌더 시스템 구동 (이제 무조건 상시 노출!)
-    if (grid) {
-      grid.drawGrid(p);
+function setup() {
+  createCanvas(CANVAS_W, CANVAS_H);
+  frameRate(FRAME_RATE);
+  textFont('monospace');
+  resetGame();
+}
+
+function resetGame() {
+  initGrid();
+  initZombies();
+  initPlayers();
+  initTiles(this);
+  gameTimer = GAME_TOTAL_TIME * FRAME_RATE;
+  betrayalTriggered = false;
+  winner = null;
+  betrayalAnnounceFade = 0;
+  soloTimer = 0;
+  deadPlayerId = null;
+  notifications = [];
+  phase = PHASE_LOBBY;
+}
+
+function draw() {
+  background(COLOR_EMPTY);
+
+  if (phase === PHASE_LOBBY) { drawLobby(this); return; }
+
+  if (phase === PHASE_END) {
+    drawGrid(this); drawZombies(this);
+    playerA.draw(this); playerB.draw(this);
+    drawResultScreen(this, countTiles(), winner);
+    return;
+  }
+
+  // 게임 진행
+  gameTimer--;
+  const timeLeftSec = gameTimer / FRAME_RATE;
+
+  // 배신 타이머 발동
+  if (!betrayalTriggered && timeLeftSec <= BETRAYAL_TRIGGER_TIME) {
+    _triggerBetrayal();
+  }
+
+  // 솔로 페이즈 타이머
+  if (phase === PHASE_SOLO) {
+    soloTimer--;
+    if (soloTimer <= 0) _reviveDeadPlayer();
+  }
+
+  updateTiles(this);
+  updateZombies([playerA, playerB], this);
+  if (playerA.alive) playerA.update(playerB, zombies, phase, this);
+  if (playerB.alive) playerB.update(playerA, zombies, phase, this);
+
+  _checkEndConditions(timeLeftSec);
+
+  drawGrid(this);
+  drawTiles(this);
+  drawZombies(this);
+  playerA.draw(this); playerB.draw(this);
+  drawBetrayalAnnounce(this);
+  drawUI(this, phase, timeLeftSec, countTiles());
+}
+
+function _triggerBetrayal() {
+  betrayalTriggered = true;
+  phase = PHASE_BETRAYAL;
+  const pA = playerA.alive ? {r:playerA.r,c:playerA.c} : {r:Math.floor(ROWS/2)-3,c:Math.floor(COLS/2)};
+  const pB = playerB.alive ? {r:playerB.r,c:playerB.c} : {r:Math.floor(ROWS/2)+3,c:Math.floor(COLS/2)};
+  voronoiSplit(pA, pB);
+  playerA.setPhase(PHASE_BETRAYAL);
+  playerB.setPhase(PHASE_BETRAYAL);
+  for (const t of playerA.tail) setOwner(t.r, t.c, OWNER_A);
+  for (const t of playerB.tail) setOwner(t.r, t.c, OWNER_B);
+  showBetrayalAnnounce(this);
+}
+
+function _checkEndConditions(timeLeftSec) {
+  // 타이머 종료
+  if (gameTimer <= 0) { _endGame('timer'); return; }
+
+  // 둘 다 사망
+  if (!playerA.alive && !playerB.alive) { _endGame('both_dead'); return; }
+
+  // 협력/솔로 페이즈: 한 명 사망 처리
+  if (phase === PHASE_COOP) {
+    if (!playerA.alive || !playerB.alive) {
+      phase = PHASE_SOLO;
+      deadPlayerId = !playerA.alive ? 'A' : 'B';
+      soloTimer = SOLO_TIME_LIMIT * FRAME_RATE;
+      const survivor = deadPlayerId === 'A' ? 'B' : 'A';
+      showNotification(survivor,
+        `P${deadPlayerId} 사망! ${SOLO_TIME_LIMIT}초 후 부활 & 배신 30초!`, '#FF9800');
     }
+  }
 
-    // 3. 아이템 박스 실시간 자동 생성 및 렌더링
-    if (currentPhase === PHASE_GAME) {
-      updateTiles(p);
+  // 배신 페이즈: 한 명 사망 → 즉시 종료
+  if (phase === PHASE_BETRAYAL) {
+    if (!playerA.alive && playerB.alive) { winner = 'B'; phase = PHASE_END; return; }
+    if (!playerB.alive && playerA.alive) { winner = 'A'; phase = PHASE_END; return; }
+  }
+}
 
-      // 플레이어 제어 및 렌더링
-      for (let player of players) {
-        player.update(p);
-        player.draw(p);
-      }
+function _reviveDeadPlayer() {
+  const midR = Math.floor(ROWS/2);
+  const midC = Math.floor(COLS/2);
+  const survivor = deadPlayerId === 'A' ? playerB : playerA;
+  const dead     = deadPlayerId === 'A' ? playerA : playerB;
 
-      // 좀비 AI 구동 및 렌더링
-      for (let zombie of zombies) {
-        zombie.update(p);
-        zombie.draw(p);
-      }
+  // 죽은 플레이어 부활 위치
+  const deadSpawnR = midR + (deadPlayerId === 'A' ? -3 : 3);
+  const deadSpawnC = midC;
 
-      // [버그 완전 타파] 상호 교전 및 꼬리 자르기 전투 충돌 연산 레이더 가동
-      checkCombatCollisions(p);
+  // Voronoi 분할로 살아있는 플레이어 영역 절반을 죽은 플레이어에게 할당
+  voronoiSplit({r:deadSpawnR, c:deadSpawnC}, {r:survivor.r, c:survivor.c});
 
-      // 메인 생존자 체크로 게임오버 판정
-      let playerAlive = players.some(pl => pl.alive);
-      if (!playerAlive) {
-        currentPhase = PHASE_OVER;
-      }
+  const deadOwner = deadPlayerId === 'A' ? OWNER_A : OWNER_B;
+  dead.revive(deadSpawnR, deadSpawnC, deadOwner);
+
+  // 배신 타이머 30초 발동
+  gameTimer = EMERGENCY_BETRAYAL_TIME * FRAME_RATE;
+  betrayalTriggered = true;
+  phase = PHASE_BETRAYAL;
+  playerA.setPhase(PHASE_BETRAYAL);
+  playerB.setPhase(PHASE_BETRAYAL);
+  deadPlayerId = null;
+
+  showBetrayalAnnounce(this);
+  showNotification('A', '부활! 배신 타이머 30초 발동!', '#FF5252');
+}
+
+function _endGame(reason) {
+  phase = PHASE_END;
+  const counts = countTiles();
+  if (reason === 'timer') {
+    // 둘 다 살아있으면 영역으로 승부
+    if (playerA.alive && playerB.alive) {
+      if (counts.A > counts.B) winner = 'A';
+      else if (counts.B > counts.A) winner = 'B';
+      else winner = 'draw';
+    } else if (playerA.alive) {
+      winner = 'A';
+    } else if (playerB.alive) {
+      winner = 'B';
     } else {
-      drawUIOverlay(p);
+      winner = 'zombie';
     }
-  };
-
-  p.mousePressed = () => {
-    if (currentPhase === PHASE_LOBBY || currentPhase === PHASE_OVER) {
-      resetGame();
-      currentPhase = PHASE_GAME;
-    }
-  };
-
-  function resetGame() {
-    // 플레이어 스폰 -> 좀비 기지 스폰 순서 엄격 교정으로 덮어쓰기 버그 예방
-    grid = new Grid(ROWS, COLS, TILE_SIZE);
-    initPlayers();
-    if (typeof initZombies === 'function') {
-      initZombies();
-    }
+  } else {
+    winner = 'zombie';
   }
+}
 
-  function checkCombatCollisions(p) {
-    if (!players || !zombies) return;
-
-    for (let i = zombies.length - 1; i >= 0; i--) {
-      let zombie = zombies[i];
-
-      for (let j = players.length - 1; j >= 0; j--) {
-        let player = players[j];
-        if (!player.alive) continue;
-
-        // 좀비와 플레이어의 픽셀 거리 계산
-        let d = p.dist(player.x, player.y, zombie.x, zombie.y);
-
-        // 몸통끼리 스쳤을 때 -> 플레이어 가차 없이 물려 사망
-        if (d < 14) {
-          player.die();
-        }
-
-        // 좀비가 뱀처럼 기어가는 플레이어의 꼬리를 밟았을 때 -> 플레이어 즉사
-        if (player.isPathContains && player.isPathContains(zombie.x, zombie.y)) {
-          player.die();
-        }
-
-        // 플레이어가 도망치다 대담하게 좀비의 꼬리를 끊었을 때 -> 좀비 격파 사망!
-        if (zombie.isPathContains && zombie.isPathContains(player.x, player.y)) {
-          zombies.splice(i, 1);
-          break; // 죽은 좀비의 내부 연산 즉시 탈출
-        }
-      }
-    }
+function keyPressed() {
+  if (phase === PHASE_LOBBY && keyCode === 32) { phase = PHASE_COOP; return; }
+  if (phase === PHASE_END && (key==='r'||key==='R')) { resetGame(); return; }
+  if (phase===PHASE_COOP || phase===PHASE_SOLO || phase===PHASE_BETRAYAL) {
+    playerA.handleKeyPressed(keyCode);
+    playerB.handleKeyPressed(keyCode);
   }
-};
+}
 
-// 독립된 p5.js 인스턴스 최종 트리거 바인딩
-new p5(sketch);
+function mousePressed() {
+  const cx=CANVAS_W/2, cy=CANVAS_H/2;
+  if (phase===PHASE_END &&
+      mouseX>cx-80&&mouseX<cx+80&&mouseY>cy+58&&mouseY<cy+96) { resetGame(); }
+  if (phase===PHASE_LOBBY &&
+      mouseX>cx-100&&mouseX<cx+100&&mouseY>cy+80&&mouseY<cy+126) { phase=PHASE_COOP; }
+}
