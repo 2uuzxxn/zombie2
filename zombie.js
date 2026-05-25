@@ -18,6 +18,10 @@ class Zombie {
     this.moveAccum = 0;
     this.tail = [];
     this.alive = true;
+    
+    // 좀비마다 고유한 순찰 목표점 (영역 확장을 위한 타겟)
+    this.patrolTarget = null;
+    this.patrolTimer = 0;
   }
 
   get speed() {
@@ -35,34 +39,92 @@ class Zombie {
   }
 
   _step(players, p) {
-    // 방향 결정
-    if (p.random() < ZOMBIE_RANDOM_CHANCE) {
-      this._randomDir(p);
-    } else {
-      let targetR = this.r, targetC = this.c, minDist = Infinity;
-      for (const pl of players) {
-        if (!pl.alive) continue;
-        // 꼬리(줄)가 있으면 꼬리를, 없으면 본체를 타겟
-        const targets = pl.tail.length > 0 ? pl.tail : [{ r: pl.r, c: pl.c }];
-        for (const t of targets) {
-          const d = Math.abs(t.r-this.r) + Math.abs(t.c-this.c);
-          if (d < minDist) { minDist = d; targetR = t.r; targetC = t.c; }
+    // 1. 좀비 꼬리가 너무 길어지면 (약 6칸 이상), 안전하게 자기 영역으로 돌아가서 땅을 굳히도록 유도
+    let isHeadingHome = false;
+    let targetR = this.r;
+    let targetC = this.c;
+
+    if (this.tail.length >= 6) {
+      // 가장 가까운 자기 좀비 땅 찾기
+      let minHomeDist = Infinity;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (getOwner(r, c) === OWNER_ZOMBIE) {
+            let d = Math.abs(r - this.r) + Math.abs(c - this.c);
+            if (d < minHomeDist) {
+              minHomeDist = d;
+              targetR = r;
+              targetC = c;
+              isHeadingHome = true;
+            }
+          }
         }
       }
+    }
+
+    // 2. 집으로 돌아가는 상태가 아니라면, 영역 확장을 위한 스마트 AI 구동
+    if (!isHeadingHome) {
+      // 30프레임(약 1초)마다 혹은 목표지에 도달하면 새로운 빈 땅을 순찰 목표로 설정
+      this.patrolTimer--;
+      if (!this.patrolTarget || this.patrolTimer <= 0 || (this.r === this.patrolTarget.r && this.c === this.patrolTarget.c)) {
+        // 무작위 빈 타일이나 플레이어 땅 중에서 목표를 선정하여 강제 확장 유도
+        let attempts = 0;
+        while (attempts < 20) {
+          let rr = Math.floor(p.random(1, ROWS - 1));
+          let cc = Math.floor(p.random(1, COLS - 1));
+          if (getOwner(rr, cc) !== OWNER_ZOMBIE) {
+            this.patrolTarget = { r: rr, c: cc };
+            break;
+          }
+          attempts++;
+        }
+        this.patrolTimer = Math.floor(p.random(45, 90)); // 1.5초~3초간 유지
+      }
+
+      // 60% 확률로는 영역 확장 순찰, 40% 확률로는 근처 플레이어 습격 (밸런스 조절)
+      if (p.random() < 0.6 && this.patrolTarget) {
+        targetR = this.patrolTarget.r;
+        targetC = this.patrolTarget.c;
+      } else {
+        // 원래 있던 플레이어 추적 로직
+        let minDist = Infinity;
+        for (const pl of players) {
+          if (!pl.alive) continue;
+          const targets = pl.tail.length > 0 ? pl.tail : [{ r: pl.r, c: pl.c }];
+          for (const t of targets) {
+            const d = Math.abs(t.r - this.r) + Math.abs(t.c - this.c);
+            if (d < minDist) { minDist = d; targetR = t.r; targetC = t.c; }
+          }
+        }
+      }
+    }
+
+    // 3. 목표 방향 결정 및 꺾기 직진 방지 (플레이어처럼 좌/우 회전 유도)
+    if (p.random() < 0.15) { 
+      // 15%의 확률로 진행 방향 근처로 꺾어 원형태(땅 점령) 동선 그리게 유도
+      this._randomDir(p);
+    } else {
       const dr = Math.sign(targetR - this.r);
       const dc = Math.sign(targetC - this.c);
+
+      // 현재 직진 방향의 반대로 역주행하는 것을 방지하면서 꺾기
       if (dr !== 0 && dc !== 0) {
-        if (p.random() < 0.5) { this.dr = dr; this.dc = 0; }
-        else { this.dr = 0; this.dc = dc; }
-      } else if (dr !== 0) { this.dr = dr; this.dc = 0; }
-        else if (dc !== 0) { this.dr = 0; this.dc = dc; }
-        else { this._randomDir(p); }
+        if (p.random() < 0.5) {
+          if (dr !== -this.dr) { this.dr = dr; this.dc = 0; }
+        } else {
+          if (dc !== -this.dc) { this.dr = 0; this.dc = dc; }
+        }
+      } else if (dr !== 0 && dr !== -this.dr) {
+        this.dr = dr; this.dc = 0;
+      } else if (dc !== 0 && dc !== -this.dc) {
+        this.dr = 0; this.dc = dc;
+      }
     }
 
     const nr = this.r + this.dr;
     const nc = this.c + this.dc;
 
-    // 맵 경계: 반사 (죽지 않음)
+    // 맵 경계: 반사
     if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) {
       this._randomDir(p);
       return;
@@ -71,25 +133,22 @@ class Zombie {
     // 꼬리(줄) 관리 & 영역 점령
     const isOnOwned = getOwner(this.r, this.c) === OWNER_ZOMBIE;
     if (isOnOwned) {
-      // 자기 영역에 돌아왔을 때 꼬리로 둘러싼 영역 채우기
       if (this.tail.length > 0) {
         const tailSet = new Set(this.tail.map(t => `${t.r},${t.c}`));
-        floodFillEnclosed(tailSet, OWNER_ZOMBIE, null);
+        // 중요: grid.js의 floodFillEnclosed를 호출해 좀비 꼬리 내부를 보라색(OWNER_ZOMBIE)으로 채움!
+        floodFillEnclosed(tailSet, OWNER_ZOMBIE, p);
         this.tail = [];
       }
     } else {
-      // 영역 밖에서는 꼬리 추가
       this.tail.push({ r: this.r, c: this.c });
     }
 
-    // 플레이어 꼬리(줄) 끊기: 좀비가 플레이어 꼬리를 밟으면 꼬리 끊기 → 플레이어 사망
-    // (좀비 자신은 죽지 않음)
+    // 플레이어 꼬리(줄) 끊기
     for (const pl of players) {
       if (!pl.alive) continue;
       const hitIdx = pl.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
-        pl._cutTailAt(nr, nc); // 플레이어 사망
-        // 좀비는 계속 이동
+        pl._cutTailAt(nr, nc);
       }
     }
 
@@ -101,7 +160,6 @@ class Zombie {
   cutTailAt(r, c) {
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
-      // 잘린 꼬리 타일 반환
       for (let i = idx; i < this.tail.length; i++) {
         setOwner(this.tail[i].r, this.tail[i].c, OWNER_NONE);
       }
@@ -118,7 +176,9 @@ class Zombie {
 
   _randomDir(p) {
     const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    const d = dirs[Math.floor(p.random(dirs.length))];
+    // 역주행 차단 로직 포함된 안전한 랜덤 방향
+    const validDirs = dirs.filter(d => !(d[0] === -this.dr && d[1] === -this.dc));
+    const d = validDirs[Math.floor(p.random(validDirs.length))];
     this.dr = d[0]; this.dc = d[1];
   }
 
@@ -143,7 +203,6 @@ class Zombie {
 
 let zombies = [];
 
-// 좀비 전용 2x2 초기 영역 생성 함수 [cite: 7]
 function createZombieInitialArea(startR, startC) {
   for (let r = startR; r < startR + 2; r++) {
     for (let c = startC; c < startC + 2; c++) {
@@ -165,14 +224,13 @@ function initZombies() {
     const r = pos[i][0];
     const c = pos[i][1];
     zombies.push(new Zombie(r, c));
-    createZombieInitialArea(r, c); // 스폰 시 2x2 초기 영역 생성 [cite: 6]
+    createZombieInitialArea(r, c);
   }
 }
 
 function updateZombies(players, p) {
   if (zombieBloodTimer > 0) zombieBloodTimer--;
 
-  // 좀비 계속 생성 (최대치 미만일 때)
   zombieSpawnTimer++;
   if (zombieSpawnTimer >= ZOMBIE_SPAWN_INTERVAL && zombies.length < ZOMBIE_MAX) {
     zombieSpawnTimer = 0;
@@ -181,14 +239,12 @@ function updateZombies(players, p) {
 
   for (const z of zombies) z.update(players, p);
 
-  // 살아있지 않은 좀비만 제거 (alive=false인 것만)
   for (let i = zombies.length-1; i >= 0; i--) {
     if (!zombies[i].alive) zombies.splice(i, 1);
   }
 }
 
 function _spawnZombie(p) {
-  // 모서리 근처 랜덤 스폰
   const corners = [
     [Math.floor(p.random(2,6)), Math.floor(p.random(2,6))],
     [Math.floor(p.random(2,6)), Math.floor(p.random(COLS-6, COLS-2))],
@@ -197,7 +253,7 @@ function _spawnZombie(p) {
   ];
   const pos = corners[Math.floor(p.random(corners.length))];
   zombies.push(new Zombie(pos[0], pos[1]));
-  createZombieInitialArea(pos[0], pos[1]); // 추가 스폰 시에도 2x2 초기 영역 생성 [cite: 6]
+  createZombieInitialArea(pos[0], pos[1]);
 }
 
 function drawZombies(p) {
