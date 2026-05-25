@@ -42,7 +42,6 @@ class Zombie {
       let targetR = this.r, targetC = this.c, minDist = Infinity;
       for (const pl of players) {
         if (!pl.alive) continue;
-        // 꼬리(줄)가 있으면 꼬리를, 없으면 본체를 타겟
         const targets = pl.tail.length > 0 ? pl.tail : [{ r: pl.r, c: pl.c }];
         for (const t of targets) {
           const d = Math.abs(t.r-this.r) + Math.abs(t.c-this.c);
@@ -68,31 +67,29 @@ class Zombie {
       return;
     }
 
-    // ── [수정 및 추가] 좀비 영역 점령 및 꼬리 관리 시스템 ──
+    // 좀비 영역 점령 및 꼬리 관리 시스템
     const isOnOwned = getOwner(this.r, this.c) === OWNER_ZOMBIE;
     if (isOnOwned) {
-      // 자기 영역 안을 걸어 다닐 때는 꼬리를 만들지 않고, 밖에서 복귀했다면 영역을 굳힘
       if (this.tail.length > 0) {
         const tailSet = new Set(this.tail.map(t => `${t.r},${t.c}`));
         floodFillEnclosed(tailSet, OWNER_ZOMBIE, null);
         this.tail = [];
       }
     } else {
-      // 자기 영역 밖에서는 꼬리(줄)를 바닥에 남김
       this.tail.push({ r: this.r, c: this.c });
       
-      // [핵심 추가] 좀비가 빈 땅(OWNER_NONE)을 지나갈 때는 즉시 좀비 땅으로 칠하면서 전진!
+      // 좀비가 빈 땅(OWNER_NONE)을 지나갈 때는 즉시 좀비 땅으로 칠하면서 전진!
       if (getOwner(this.r, this.c) === OWNER_NONE) {
         setOwner(this.r, this.c, OWNER_ZOMBIE);
       }
     }
 
-    // 플레이어 꼬리(줄) 끊기: 좀비가 플레이어 꼬리를 밟으면 꼬리 끊기 → 플레이어 사망
+    // 플레이어 꼬리(줄) 끊기
     for (const pl of players) {
       if (!pl.alive) continue;
       const hitIdx = pl.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
-        pl._cutTailAt(nr, nc); // 플레이어 사망
+        pl._cutTailAt(nr, nc);
       }
     }
 
@@ -100,11 +97,9 @@ class Zombie {
     this.c = nc;
   }
 
-  // 플레이어가 좀비 꼬리(줄)를 밟으면 → 좀비 사망
   cutTailAt(r, c) {
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
-      // 잘린 꼬리 타일 반환
       for (let i = idx; i < this.tail.length; i++) {
         setOwner(this.tail[i].r, this.tail[i].c, OWNER_NONE);
       }
@@ -127,13 +122,11 @@ class Zombie {
 
   draw(p) {
     if (!this.alive) return;
-    // 꼬리(줄) 그리기
     p.noStroke();
     p.fill(zombieBloodTimer > 0 ? p.color(200,0,0,160) : p.color(120,50,180,160));
     for (const t of this.tail) {
       p.rect(t.c*TILE_SIZE+4, t.r*TILE_SIZE+4, TILE_SIZE-8, TILE_SIZE-8, 2);
     }
-    // 본체
     const x = this.c*TILE_SIZE, y = this.r*TILE_SIZE;
     p.fill(zombieBloodTimer > 0 ? '#E53935' : '#AB47BC');
     p.noStroke();
@@ -150,17 +143,27 @@ function initZombies() {
   zombies = [];
   zombieBloodTimer = 0;
   zombieSpawnTimer = 0;
+
+  // ── [버그 수정] 좌표 연산에 안전한 Math.floor를 사용하여 온전한 숫자 데이터 배열 생성 ──
+  const midR = Math.floor(ROWS / 2);
+  const midC = Math.floor(COLS / 2);
+  
   const pos = [
-    [3,3],[3,COLS-4],[ROWS-4,3],[ROWS-4,COLS-4],[ROWS/2|0,3],[3,COLS/2|0]
+    [3, 3], 
+    [3, COLS - 4], 
+    [ROWS - 4, 3], 
+    [ROWS - 4, COLS - 4], 
+    [midR, 3], 
+    [3, midC]
   ];
   
-  // [초기화 추가] 좀비가 맵 구석 스폰 지역 주위로 초기 땅을 가지고 시작하도록 설정
+  // 좀비 생성 및 집(보라색 영역 3x3) 강제 생성
   for (let i = 0; i < Math.min(ZOMBIE_COUNT, pos.length); i++) {
     const startR = pos[i][0];
     const startC = pos[i][1];
     zombies.push(new Zombie(startR, startC));
     
-    // 스폰 위치 주변 3x3 타일을 좀비 땅으로 만들어 줌 (집 개념)
+    // 스폰 위치 주변 3x3 타일을 좀비 땅으로 확실하게 칠해버림!
     for (let r = startR - 1; r <= startR + 1; r++) {
       for (let c = startC - 1; c <= startC + 1; c++) {
         if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
@@ -174,7 +177,6 @@ function initZombies() {
 function updateZombies(players, p) {
   if (zombieBloodTimer > 0) zombieBloodTimer--;
 
-  // 좀비 계속 생성 (최대치 미만일 때)
   zombieSpawnTimer++;
   if (zombieSpawnTimer >= ZOMBIE_SPAWN_INTERVAL && zombies.length < ZOMBIE_MAX) {
     zombieSpawnTimer = 0;
@@ -183,14 +185,12 @@ function updateZombies(players, p) {
 
   for (const z of zombies) z.update(players, p);
 
-  // 살아있지 않은 좀비만 제거 (alive=false인 것만)
   for (let i = zombies.length-1; i >= 0; i--) {
     if (!zombies[i].alive) zombies.splice(i, 1);
   }
 }
 
 function _spawnZombie(p) {
-  // 모서리 근처 랜덤 스폰
   const corners = [
     [Math.floor(p.random(2,6)), Math.floor(p.random(2,6))],
     [Math.floor(p.random(2,6)), Math.floor(p.random(COLS-6, COLS-2))],
@@ -202,9 +202,11 @@ function _spawnZombie(p) {
   const zC = pos[1];
   
   zombies.push(new Zombie(zR, zC));
-  
-  // 추가 스폰되는 좀비 주변도 땅 한 칸씩 점령해주기
   setOwner(zR, zC, OWNER_ZOMBIE);
+}
+
+function drawZombies(p) {
+  for (const z of zombies) z.draw(p);
 }
 
 function drawZombies(p) {
