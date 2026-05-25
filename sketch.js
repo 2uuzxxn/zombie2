@@ -16,9 +16,11 @@ function setup() {
 
 function resetGame() {
   initGrid();
-  initZombies();
-  initPlayers();
+  // ── [순서 수정] 플레이어를 먼저 만들고 좀비를 나중에 만들어야 좀비 집이 안 지워져! ──
+  initPlayers();  // 초록색 플레이어 팀 땅을 먼저 생성
+  initZombies();  // 보라색 좀비 기지(3x3)를 그 위에 덮어써서 보금자리 확보!
   initTiles(this);
+  
   gameTimer = GAME_TOTAL_TIME * FRAME_RATE;
   betrayalTriggered = false;
   winner = null;
@@ -41,16 +43,13 @@ function draw() {
     return;
   }
 
-  // 게임 진행
   gameTimer--;
   const timeLeftSec = gameTimer / FRAME_RATE;
 
-  // 배신 타이머 발동
   if (!betrayalTriggered && timeLeftSec <= BETRAYAL_TRIGGER_TIME) {
     _triggerBetrayal();
   }
 
-  // 솔로 페이즈 타이머
   if (phase === PHASE_SOLO) {
     soloTimer--;
     if (soloTimer <= 0) _reviveDeadPlayer();
@@ -85,13 +84,10 @@ function _triggerBetrayal() {
 }
 
 function _checkEndConditions(timeLeftSec) {
-  // 타이머 종료
   if (gameTimer <= 0) { _endGame('timer'); return; }
 
-  // 둘 다 사망
   if (!playerA.alive && !playerB.alive) { _endGame('both_dead'); return; }
 
-  // 협력/솔로 페이즈: 한 명 사망 처리
   if (phase === PHASE_COOP) {
     if (!playerA.alive || !playerB.alive) {
       phase = PHASE_SOLO;
@@ -103,7 +99,6 @@ function _checkEndConditions(timeLeftSec) {
     }
   }
 
-  // 배신 페이즈: 한 명 사망 → 즉시 종료
   if (phase === PHASE_BETRAYAL) {
     if (!playerA.alive && playerB.alive) { winner = 'B'; phase = PHASE_END; return; }
     if (!playerB.alive && playerA.alive) { winner = 'A'; phase = PHASE_END; return; }
@@ -116,17 +111,14 @@ function _reviveDeadPlayer() {
   const survivor = deadPlayerId === 'A' ? playerB : playerA;
   const dead     = deadPlayerId === 'A' ? playerA : playerB;
 
-  // 죽은 플레이어 부활 위치
   const deadSpawnR = midR + (deadPlayerId === 'A' ? -3 : 3);
   const deadSpawnC = midC;
 
-  // Voronoi 분할로 살아있는 플레이어 영역 절반을 죽은 플레이어에게 할당
   voronoiSplit({r:deadSpawnR, c:deadSpawnC}, {r:survivor.r, c:survivor.c});
 
   const deadOwner = deadPlayerId === 'A' ? OWNER_A : OWNER_B;
   dead.revive(deadSpawnR, deadSpawnC, deadOwner);
 
-  // 배신 타이머 30초 발동
   gameTimer = EMERGENCY_BETRAYAL_TIME * FRAME_RATE;
   betrayalTriggered = true;
   phase = PHASE_BETRAYAL;
@@ -142,9 +134,8 @@ function _endGame(reason) {
   phase = PHASE_END;
   const counts = countTiles();
   if (reason === 'timer') {
-    // 둘 다 살아있으면 영역으로 승부
     if (playerA.alive && playerB.alive) {
-      if (counts.A > counts.B) winner = 'A';
+      if (counts.A > counts.A) winner = 'A';
       else if (counts.B > counts.A) winner = 'B';
       else winner = 'draw';
     } else if (playerA.alive) {
