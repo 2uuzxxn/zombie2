@@ -17,7 +17,7 @@ class Zombie {
 
     // AI 성향 설정을 위한 타이머 (영역 확장 모드 vs 플레이어 추격 모드)
     this.aiMode = 'expand'; // 'expand' 또는 'chase'
-    this.modeTimer = Math.floor(random(60, 180)); // 모드 유지 시간 (2~3초)
+    this.modeTimer = Math.floor(Math.random() * (180 - 60) + 60); // 모드 유지 시간 (2~3초)
     
     // 초기 2x2 집(영역) 생성하기
     this._createInitialHome();
