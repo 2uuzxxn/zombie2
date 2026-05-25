@@ -7,6 +7,10 @@ let winner = null;
 let soloTimer = 0;
 let deadPlayerId = null;
 
+// ── [🚨 누락된 핵심 전역 변수 추가] ──
+let zombies = [];          // 좀비들을 담을 배열
+let zombieBloodTimer = 0;   // 좀비 폭주 타이머
+
 function setup() {
   createCanvas(CANVAS_W, CANVAS_H);
   frameRate(FRAME_RATE);
@@ -14,6 +18,7 @@ function setup() {
   resetGame();
 }
 
+// ... 그 아래 resetGame()부터는 기존 코드 그대로 두시면 됩니다.
 function resetGame() {
   initGrid();
   // ── [순서 수정] 플레이어를 먼저 만들고 좀비를 나중에 만들어야 좀비 집이 안 지워져! ──
