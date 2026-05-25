@@ -135,7 +135,7 @@ function _endGame(reason) {
   const counts = countTiles();
   if (reason === 'timer') {
     if (playerA.alive && playerB.alive) {
-      if (counts.A > counts.A) winner = 'A';
+      if (counts.A > counts.B) winner = 'A';
       else if (counts.B > counts.A) winner = 'B';
       else winner = 'draw';
     } else if (playerA.alive) {
