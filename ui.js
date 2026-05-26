@@ -1,5 +1,3 @@
-// ui.js — HUD, 타이머 바, 결과 화면, 알림
-
 let notifications = [];
 
 function showNotification(playerId, msg, color) {
@@ -34,15 +32,15 @@ function drawUI(p, phase, timeLeft, counts) {
     p.text(`B: ${counts.B}`, barX+barW, 14);
   }
 
-  // ── 타임바 (남은 시간, 상단 4px 바 1개) ──
+  // ── 타임바 ──
   const totalTime = (phase === PHASE_SOLO) ? SOLO_TIME_LIMIT
                   : (phase === PHASE_BETRAYAL || betrayalTriggered) ? EMERGENCY_BETRAYAL_TIME
                   : GAME_TOTAL_TIME;
   const timeFraction = Math.max(0, Math.min(1, timeLeft / GAME_TOTAL_TIME));
-  // 배경
+  
   p.noStroke(); p.fill(50);
   p.rect(0, hudH, CANVAS_W, 5);
-  // 남은 시간 바
+  
   const barColor = timeFraction > 0.4 ? '#4CAF50' : timeFraction > 0.15 ? '#FF9800' : '#F44336';
   p.fill(barColor);
   p.rect(0, hudH, CANVAS_W * timeFraction, 5);
@@ -69,18 +67,15 @@ function drawUI(p, phase, timeLeft, counts) {
   else if (phase === PHASE_SOLO){ p.fill('#FF9800'); p.text('[ 한 명 사망 — 제한시간! ]', CANVAS_W/2, 38); }
   else if (phase === PHASE_BETRAYAL){ p.fill('#FF5252'); p.text('[ 배신 페이즈 — 팀원도 적! ]', CANVAS_W/2, 38); }
 
-  // 배신 페이즈 테두리
   if (phase === PHASE_BETRAYAL) {
     const alpha = 80 + Math.sin(p.frameCount*0.1)*40;
     p.noFill(); p.stroke(255,50,50,alpha); p.strokeWeight(6);
     p.rect(3,3,CANVAS_W-6,CANVAS_H-6,2); p.noStroke();
   }
 
-  // 플레이어 상태
   _drawPlayerStatus(p, playerA, 10, hudH+10, 'A');
   _drawPlayerStatus(p, playerB, CANVAS_W-10, hudH+10, 'B');
 
-  // 좀비 피 효과
   if (zombieBloodTimer > 0) {
     p.fill('#E53935'); p.textSize(10); p.textAlign(p.CENTER, p.TOP);
     p.text(`🩸 좀비 가속 ${Math.ceil(zombieBloodTimer/FRAME_RATE)}초`, CANVAS_W/2, hudH+10);
@@ -161,11 +156,11 @@ function drawLobby(p) {
   p.fill(COLOR_A); p.text('플레이어 A: W A S D', cx-120, cy-72);
   p.fill(COLOR_B); p.text('플레이어 B: ↑ ↓ ← →', cx+120, cy-72);
   p.textSize(11); p.fill(160);
-  p.text('협력 페이즈 40초 → 배신 페이즈 20초', cx, cy-38);
+  p.text('협력 페이즈 30초 → 배신 페이즈 30초', cx, cy-38);
   p.text('상대 꼬리를 끊어야 죽음 / 머리끼리 부딪히면 밀려남', cx, cy-18);
   p.text('맵 밖으로 나갈 수 없음', cx, cy+2);
   p.fill(255,165,0);
-  p.text('💊 약: 보너스 땅   🩸 피: 좀비 가속   ⚡ 에너지드링크: 속도2배+강철꼬리', cx, cy+32);
+  p.text('💊 약: 보너스 땅   🩸 피: 좀비 가속   ⚡ 에너지드링크: 속도2배 + 절대무적', cx, cy+32);
   p.fill(180); p.text('좀비 꼬리를 밟으면 좀비가 죽습니다!', cx, cy+52);
   const blink = Math.floor(p.frameCount/20)%2===0;
   p.fill(blink?'#4CAF50':'#2E7D32'); p.noStroke();
