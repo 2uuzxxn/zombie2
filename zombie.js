@@ -1,13 +1,7 @@
-// zombie.js
-// - 꼬리(줄)를 끊겨야만 죽음
-// - 자신의 땅 영역 보유 가능
-// - 계속 생성됨 (최대 수 유지)
-// - 플레이어 줄을 끊어도 좀비는 죽지 않음
-
 let zombieBloodTimer = 0;
 let zombieSpawnTimer = 0;
-const ZOMBIE_SPAWN_INTERVAL = 300; // 10초마다 좀비 추가 생성
-const ZOMBIE_MAX = 12;             // 최대 좀비 수
+const ZOMBIE_SPAWN_INTERVAL = 300; 
+const ZOMBIE_MAX = 12;             
 
 class Zombie {
   constructor(r, c) {
@@ -19,9 +13,10 @@ class Zombie {
     this.tail = [];
     this.alive = true;
     
-    // 좀비마다 고유한 순찰 목표점 (영역 확장을 위한 타겟)
     this.patrolTarget = null;
     this.patrolTimer = 0;
+    this.spawnOriginR = r; // 정화 보상용 기지 추적 좌표 저장
+    this.spawnOriginC = c;
   }
 
   get speed() {
@@ -39,13 +34,11 @@ class Zombie {
   }
 
   _step(players, p) {
-    // 1. 좀비 꼬리가 너무 길어지면 (약 6칸 이상), 안전하게 자기 영역으로 돌아가서 땅을 굳히도록 유도
     let isHeadingHome = false;
     let targetR = this.r;
     let targetC = this.c;
 
     if (this.tail.length >= 6) {
-      // 가장 가까운 자기 좀비 땅 찾기
       let minHomeDist = Infinity;
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
@@ -62,12 +55,9 @@ class Zombie {
       }
     }
 
-    // 2. 집으로 돌아가는 상태가 아니라면, 영역 확장을 위한 스마트 AI 구동
     if (!isHeadingHome) {
-      // 30프레임(약 1초)마다 혹은 목표지에 도달하면 새로운 빈 땅을 순찰 목표로 설정
       this.patrolTimer--;
       if (!this.patrolTarget || this.patrolTimer <= 0 || (this.r === this.patrolTarget.r && this.c === this.patrolTarget.c)) {
-        // 무작위 빈 타일이나 플레이어 땅 중에서 목표를 선정하여 강제 확장 유도
         let attempts = 0;
         while (attempts < 20) {
           let rr = Math.floor(p.random(1, ROWS - 1));
@@ -78,15 +68,13 @@ class Zombie {
           }
           attempts++;
         }
-        this.patrolTimer = Math.floor(p.random(45, 90)); // 1.5초~3초간 유지
+        this.patrolTimer = Math.floor(p.random(45, 90)); 
       }
 
-      // 60% 확률로는 영역 확장 순찰, 40% 확률로는 근처 플레이어 습격 (밸런스 조절)
       if (p.random() < 0.6 && this.patrolTarget) {
         targetR = this.patrolTarget.r;
         targetC = this.patrolTarget.c;
       } else {
-        // 원래 있던 플레이어 추적 로직
         let minDist = Infinity;
         for (const pl of players) {
           if (!pl.alive) continue;
@@ -99,15 +87,12 @@ class Zombie {
       }
     }
 
-    // 3. 목표 방향 결정 및 꺾기 직진 방지 (플레이어처럼 좌/우 회전 유도)
     if (p.random() < 0.15) { 
-      // 15%의 확률로 진행 방향 근처로 꺾어 원형태(땅 점령) 동선 그리게 유도
       this._randomDir(p);
     } else {
       const dr = Math.sign(targetR - this.r);
       const dc = Math.sign(targetC - this.c);
 
-      // 현재 직진 방향의 반대로 역주행하는 것을 방지하면서 꺾기
       if (dr !== 0 && dc !== 0) {
         if (p.random() < 0.5) {
           if (dr !== -this.dr) { this.dr = dr; this.dc = 0; }
@@ -124,18 +109,15 @@ class Zombie {
     const nr = this.r + this.dr;
     const nc = this.c + this.dc;
 
-    // 맵 경계: 반사
     if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) {
       this._randomDir(p);
       return;
     }
 
-    // 꼬리(줄) 관리 & 영역 점령
     const isOnOwned = getOwner(this.r, this.c) === OWNER_ZOMBIE;
     if (isOnOwned) {
       if (this.tail.length > 0) {
         const tailSet = new Set(this.tail.map(t => `${t.r},${t.c}`));
-        // 중요: grid.js의 floodFillEnclosed를 호출해 좀비 꼬리 내부를 보라색(OWNER_ZOMBIE)으로 채움!
         floodFillEnclosed(tailSet, OWNER_ZOMBIE, p);
         this.tail = [];
       }
@@ -143,7 +125,11 @@ class Zombie {
       this.tail.push({ r: this.r, c: this.c });
     }
 
-    // 플레이어 꼬리(줄) 끊기
+    // ⭐ [2단계 고유 기능] 좀비 오염 패시브: 움직이기만 해도 지나간 자리가 실시간 좀비 땅화
+    if (currentLevel === 2) {
+      setOwner(nr, nc, OWNER_ZOMBIE);
+    }
+
     for (const pl of players) {
       if (!pl.alive) continue;
       const hitIdx = pl.tail.findIndex(t => t.r === nr && t.c === nc);
@@ -156,14 +142,25 @@ class Zombie {
     this.c = nc;
   }
 
-  // 플레이어가 좀비 꼬리(줄)를 밟으면 → 좀비 사망
-  cutTailAt(r, c) {
+  // ⭐ 핵심 수정: 좀비 사냥 시 클리어 단계 보상 연동
+  cutTailAt(r, c, killerId, phase) {
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
       for (let i = idx; i < this.tail.length; i++) {
         setOwner(this.tail[i].r, this.tail[i].c, OWNER_NONE);
       }
       this.tail.splice(idx);
+
+      // [1단계 보상] 좀비를 잡으면 그 좀비의 2x2 오리진 영토를 아군 땅으로 흡수 정화!
+      if (currentLevel === 1) {
+        const rewardOwner = phase === PHASE_COOP ? OWNER_TEAM : (killerId === 'A' ? OWNER_A : OWNER_B);
+        for (let or = this.spawnOriginR; or < this.spawnOriginR + 2; or++) {
+          for (let oc = this.spawnOriginC; oc < this.spawnOriginC + 2; oc++) {
+            if (getOwner(or, oc) === OWNER_ZOMBIE) setOwner(or, oc, rewardOwner);
+          }
+        }
+        showNotification(killerId, `좀비 퇴치! 보라색 스폰 영역을 아군 영역으로 정화했습니다!`, '#4CAF50');
+      }
       this._die();
     }
   }
@@ -176,7 +173,6 @@ class Zombie {
 
   _randomDir(p) {
     const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
-    // 역주행 차단 로직 포함된 안전한 랜덤 방향
     const validDirs = dirs.filter(d => !(d[0] === -this.dr && d[1] === -this.dc));
     const d = validDirs[Math.floor(p.random(validDirs.length))];
     this.dr = d[0]; this.dc = d[1];
@@ -184,13 +180,11 @@ class Zombie {
 
   draw(p) {
     if (!this.alive) return;
-    // 꼬리(줄) 그리기
     p.noStroke();
     p.fill(zombieBloodTimer > 0 ? p.color(200,0,0,160) : p.color(120,50,180,160));
     for (const t of this.tail) {
       p.rect(t.c*TILE_SIZE+4, t.r*TILE_SIZE+4, TILE_SIZE-8, TILE_SIZE-8, 2);
     }
-    // 본체
     const x = this.c*TILE_SIZE, y = this.r*TILE_SIZE;
     p.fill(zombieBloodTimer > 0 ? '#E53935' : '#AB47BC');
     p.noStroke();
