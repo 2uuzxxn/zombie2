@@ -90,7 +90,7 @@ class Player {
       return;
     }
 
-    // ⭐ [핵심 변경] 오직 배신 페이즈(PHASE_BETRAYAL)에서만 팀원의 꼬리를 끊어 죽일 수 있음!
+    // ⭐ 핵심 수정: 배신 페이즈(PHASE_BETRAYAL)에서 상대방의 꼬리를 끊었을 때 단계별 판정
     if (phase === PHASE_BETRAYAL && otherPlayer && otherPlayer.alive) {
       const hitIdx = otherPlayer.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
@@ -99,7 +99,17 @@ class Player {
           this.nextDc = -this.dc;
           return;
         } else {
-          otherPlayer._cutTailAt(nr, nc);
+          if (currentLevel === 1) {
+            // [1단계] 건전한 땅 경쟁: 상대 꼬리를 끊어 영토 초기화만 시키고 죽이지는 않음
+            for (let i = hitIdx; i < otherPlayer.tail.length; i++) {
+              setOwner(otherPlayer.tail[i].r, otherPlayer.tail[i].c, OWNER_NONE);
+            }
+            otherPlayer.tail.splice(hitIdx);
+            showNotification(this.id, `P${this.id}가 P${otherPlayer.id}의 꼬리를 끊어 땅 확장을 방해했습니다!`, '#FF9800');
+          } else {
+            // [2단계] 비정한 데스매치: 꼬리가 밟히면 즉사
+            otherPlayer._cutTailAt(nr, nc);
+          }
         }
       }
     }
@@ -112,7 +122,7 @@ class Player {
         return;
       }
       if (z.tail.some(t => t.r === nr && t.c === nc)) {
-        z.cutTailAt(nr, nc);
+        z.cutTailAt(nr, nc, this.id, phase); // 좀비 사냥 시 플레이어 ID와 현재 페이즈 전달
         break;
       }
     }
