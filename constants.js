@@ -1,11 +1,11 @@
-const TILE_SIZE = 18;
-const COLS = 50;
-const ROWS = 50;
+const TILE_SIZE = 12; // 70x70 맵에 맞춘 최적 크기
+const COLS = 70;
+const ROWS = 70;
 const CANVAS_W = COLS * TILE_SIZE;
 const CANVAS_H = ROWS * TILE_SIZE;
 
 const GAME_TOTAL_TIME = 60;        // 전체 게임 시간 1분
-const BETRAYAL_TRIGGER_TIME = 30;  // ⭐ 핵심 수정: 남은 시간이 30초 이하가 되면 배신 타이머가 켜집니다.
+const BETRAYAL_TRIGGER_TIME = 30;  // 30초 이하가 되면 배신 타이머 작동
 
 const SOLO_TIME_LIMIT = 30;         // 한 명 사망 후 제한 시간 30초
 const EMERGENCY_BETRAYAL_TIME = 30; // 부활 후 배신 타이머 30초
@@ -15,13 +15,12 @@ const BOOST_MULTIPLIER = 2.0;
 const BOOST_DURATION = 150;
 const STEEL_TAIL_DURATION = 150;
 
-const ZOMBIE_COUNT = 6;
+const ZOMBIE_COUNT = 8;
 const ZOMBIE_SPEED_NORMAL = 4.2;    
 const ZOMBIE_SPEED_BOOSTED = 8.5;   
 const ZOMBIE_BLOOD_DURATION = 150;
-const ZOMBIE_RANDOM_CHANCE = 0.03;
 
-const BOX_COUNT_EACH = 3;
+const BOX_COUNT_EACH = 4;
 const BOMB_RADIUS = 3;
 
 const OWNER_NONE = null;
@@ -50,6 +49,3 @@ const COLOR_EMPTY  = '#1a1a1a';
 const COLOR_GRID   = '#222222';
 
 const FRAME_RATE = 30;
-
-// ⭐ 레벨 시스템 전역 변수 (초기값 1단계)
-let currentLevel = 1;
