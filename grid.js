@@ -1,5 +1,3 @@
-// grid.js — 게임판 관리
-
 let grid = [];
 
 function initGrid() {
@@ -53,7 +51,7 @@ function tileColor(owner) {
   }
 }
 
-// BFS flood fill: 꼬리로 둘러싸인 내부 빈 타일을 owner로 채움
+// 꼬리로 둘러싸인 내부 영역을 내 땅으로 채우는 BFS 알고리즘
 function floodFillEnclosed(tailSet, owner, p) {
   const visited = new Set();
   const queue = [];
@@ -98,7 +96,7 @@ function floodFillEnclosed(tailSet, owner, p) {
   }
 }
 
-// Voronoi 분할: 배신 시 팀 영역을 두 플레이어 위치 기준으로 분할
+// 배신 시 팀 영역 분할 알고리즘 (보로노이 다이어그램)
 function voronoiSplit(posA, posB) {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
