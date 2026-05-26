@@ -42,7 +42,6 @@ function draw() {
   gameTimer--;
   const timeLeftSec = gameTimer / FRAME_RATE;
 
-  // 남은 시간이 30초 이하가 되는 순간 배신 페이즈 트리거 작동
   if (!betrayalTriggered && timeLeftSec <= BETRAYAL_TRIGGER_TIME) {
     _triggerBetrayal();
   }
@@ -54,7 +53,6 @@ function draw() {
 
   updateTiles(this);
   updateZombies([playerA, playerB], this);
-  
   if (playerA.alive) playerA.update(playerB, zombies, phase, this);
   if (playerB.alive) playerB.update(playerA, zombies, phase, this);
 
@@ -65,7 +63,6 @@ function draw() {
   drawZombies(this);
   playerA.draw(this); playerB.draw(this);
   drawBetrayalAnnounce(this);
-  
   drawUI(this, phase, timeLeftSec, countTiles());
 }
 
