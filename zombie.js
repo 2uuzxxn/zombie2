@@ -15,8 +15,6 @@ class Zombie {
     
     this.patrolTarget = null;
     this.patrolTimer = 0;
-    this.spawnOriginR = r; 
-    this.spawnOriginC = c;
   }
 
   get speed() {
@@ -38,6 +36,7 @@ class Zombie {
     let targetR = this.r;
     let targetC = this.c;
 
+    // 꼬리가 6칸 이상 길어지면 귀환 본능 작동
     if (this.tail.length >= 6) {
       let minHomeDist = Infinity;
       for (let r = 0; r < ROWS; r++) {
@@ -55,6 +54,7 @@ class Zombie {
       }
     }
 
+    // 영역 확장을 위한 패트롤 AI 구동
     if (!isHeadingHome) {
       this.patrolTimer--;
       if (!this.patrolTarget || this.patrolTimer <= 0 || (this.r === this.patrolTarget.r && this.c === this.patrolTarget.c)) {
@@ -125,14 +125,11 @@ class Zombie {
       this.tail.push({ r: this.r, c: this.c });
     }
 
-    // 지나다니며 실시간 땅 오염 패시브 결합
-    setOwner(nr, nc, OWNER_ZOMBIE);
-
     for (const pl of players) {
       if (!pl.alive) continue;
       const hitIdx = pl.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
-        pl._cutTailAt(nr, nc); // 플레이어 꼬리 자르기 호출 (내부에서 무적 판정 제어)
+        pl._cutTailAt(nr, nc);
       }
     }
 
@@ -140,22 +137,13 @@ class Zombie {
     this.c = nc;
   }
 
-  cutTailAt(r, c, killerId, phase) {
+  cutTailAt(r, c) {
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
       for (let i = idx; i < this.tail.length; i++) {
         setOwner(this.tail[i].r, this.tail[i].c, OWNER_NONE);
       }
       this.tail.splice(idx);
-
-      // 좀비 사냥 시 고유 스폰 영역 아군 땅으로 흡수 정화 기믹 고정
-      const rewardOwner = phase === PHASE_COOP ? OWNER_TEAM : (killerId === 'A' ? OWNER_A : OWNER_B);
-      for (let or = this.spawnOriginR; or < this.spawnOriginR + 2; or++) {
-        for (let oc = this.spawnOriginC; oc < this.spawnOriginC + 2; oc++) {
-          if (getOwner(or, oc) === OWNER_ZOMBIE) setOwner(or, oc, rewardOwner);
-        }
-      }
-      showNotification(killerId, `좀비 퇴치! 스폰 구역을 아군 영역으로 정화했습니다!`, '#4CAF50');
       this._die();
     }
   }
@@ -178,14 +166,15 @@ class Zombie {
     p.noStroke();
     p.fill(zombieBloodTimer > 0 ? p.color(200,0,0,160) : p.color(120,50,180,160));
     for (const t of this.tail) {
-      p.rect(t.c*TILE_SIZE+2, t.r*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4, 1);
+      p.rect(t.c*TILE_SIZE+4, t.r*TILE_SIZE+4, TILE_SIZE-8, TILE_SIZE-8, 2);
     }
     const x = this.c*TILE_SIZE, y = this.r*TILE_SIZE;
     p.fill(zombieBloodTimer > 0 ? '#E53935' : '#AB47BC');
-    p.rect(x+1, y+1, TILE_SIZE-2, TILE_SIZE-2, 3);
+    p.noStroke();
+    p.rect(x+2, y+2, TILE_SIZE-4, TILE_SIZE-4, 4);
     p.fill(255, 50, 50);
-    p.ellipse(x+4, y+5, 2, 2);
-    p.ellipse(x+8, y+5, 2, 2);
+    p.ellipse(x+6, y+7, 4, 4);
+    p.ellipse(x+12, y+7, 4, 4);
   }
 }
 
@@ -206,7 +195,7 @@ function initZombies() {
   zombieBloodTimer = 0;
   zombieSpawnTimer = 0;
   const pos = [
-    [3,3],[3,COLS-4],[ROWS-4,3],[ROWS-4,COLS-4],[Math.floor(ROWS/2),3],[3,Math.floor(COLS/2)]
+    [3,3],[3,COLS-4],[ROWS-4,3],[ROWS-4,COLS-4],[ROWS/2|0,3],[3,COLS/2|0]
   ];
   for (let i = 0; i < Math.min(ZOMBIE_COUNT, pos.length); i++) {
     const r = pos[i][0];
