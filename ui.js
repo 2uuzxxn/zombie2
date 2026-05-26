@@ -31,9 +31,6 @@ function drawUI(p, phase, timeLeft, counts) {
     p.text(`B: ${counts.B}`, barX+barW, 14);
   }
 
-  const totalTime = (phase === PHASE_SOLO) ? SOLO_TIME_LIMIT
-                  : (phase === PHASE_BETRAYAL || betrayalTriggered) ? EMERGENCY_BETRAYAL_TIME
-                  : GAME_TOTAL_TIME;
   const timeFraction = Math.max(0, Math.min(1, timeLeft / GAME_TOTAL_TIME));
   
   p.noStroke(); p.fill(50);
@@ -152,7 +149,7 @@ function drawLobby(p) {
   p.fill(COLOR_A); p.text('플레이어 A: W A S D', cx-120, cy-72);
   p.fill(COLOR_B); p.text('플레이어 B: ↑ ↓ ← →', cx+120, cy-72);
   p.textSize(11); p.fill(160);
-  p.text('협력 페이즈 40초 → 배신 페이즈 20초', cx, cy-38);
+  p.text('협력 페이즈 30초 → 배신 페이즈 30초', cx, cy-38);
   p.text('상대 꼬리를 끊어야 죽음 / 머리끼리 부딪히면 밀려남', cx, cy-18);
   p.text('맵 밖으로 나갈 수 없음', cx, cy+2);
   p.fill(255,165,0);
