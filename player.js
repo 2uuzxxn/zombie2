@@ -64,11 +64,13 @@ class Player {
     let nr = this.r + this.dr;
     let nc = this.c + this.dc;
 
+    // 맵 바깥 진출 금지
     if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) {
       this.nextDr = 0; this.nextDc = 0; this.dr = 0; this.dc = 0;
       return;
     }
 
+    // 1. 자신의 영토에 밟았을 때 땅 채우기 처리
     const onOwned = getOwner(this.r, this.c) === this.owner;
     if (onOwned) {
       if (this.tail.length > 0) {
@@ -77,24 +79,28 @@ class Player {
         this.tail = [];
       }
     } else {
+      // 내 땅이 아니면 현재 칸을 꼬리로 저장 (내 땅 소유권은 아직 변경 안 함)
       this.tail.push({ r: this.r, c: this.c });
     }
 
+    // 2. 스스로 자기 꼬리 충돌 검사 (에너지드링크 무적 상태면 면제)
     if (this.tail.some(t => t.r === nr && t.c === nc)) {
       if (this.steelTailTimer <= 0) { this._die(); return; }
     }
 
+    // 머리끼리 충돌 시 튕김 처리
     if (otherPlayer && otherPlayer.alive && otherPlayer.r === nr && otherPlayer.c === nc) {
       this.nextDr = -this.dr;
       this.nextDc = -this.dc;
       return;
     }
 
-    // ⭐ 핵심 수정: 오직 배신 페이즈(PHASE_BETRAYAL)에서만 팀원의 꼬리를 끊어 죽일 수 있음!
+    // 3. 배신 페이즈일 때 상대 플레이어 꼬리 끊기 공격
     if (phase === PHASE_BETRAYAL && otherPlayer && otherPlayer.alive) {
       const hitIdx = otherPlayer.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
         if (otherPlayer.steelTailTimer > 0) {
+          // 상대방이 무적 상태라면 튕겨나감
           this.nextDr = -this.dr;
           this.nextDc = -this.dc;
           return;
@@ -104,24 +110,32 @@ class Player {
       }
     }
 
+    // 4. ⭐ 플레이어가 좀비의 머리나 꼬리를 밟았을 때 처리 추가
     for (const z of zombiesArr) {
       if (!z.alive) continue;
+      // 좀비 머리와 충돌하면 튕김
       if (z.r === nr && z.c === nc) {
         this.nextDr = -this.dr;
         this.nextDc = -this.dc;
         return;
       }
-      if (z.tail.some(t => t.r === nr && t.c === nc)) {
-        z.cutTailAt(nr, nc);
+      // 좀비의 꼬리를 밟으면 좀비를 처단!
+      const zTailIdx = z.tail.findIndex(t => t.r === nr && t.c === nc);
+      if (zTailIdx !== -1) {
+        z.cutTailAt(nr, nc); // 좀비의 꼬리를 끊어 죽임
         break;
       }
     }
 
+    // 위치 이동 확정
     this.r = nr;
     this.c = nc;
   }
 
   _cutTailAt(r, c) {
+    // ⭐ 무적(강철꼬리) 상태라면 꼬리가 밟혀도 무시하고 생존
+    if (this.steelTailTimer > 0) return;
+
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
       for (let i = idx; i < this.tail.length; i++) {
