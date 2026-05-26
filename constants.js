@@ -5,7 +5,7 @@ const CANVAS_W = COLS * TILE_SIZE;
 const CANVAS_H = ROWS * TILE_SIZE;
 
 const GAME_TOTAL_TIME = 60;        // 전체 게임 시간 1분
-const BETRAYAL_TRIGGER_TIME = 20;  // 배신 타이머 발동 잔여 시간 20초
+const BETRAYAL_TRIGGER_TIME = 30;  // 게임 시작 30초 후(남은 시간 30초) 배신 페이즈 시작
 
 const SOLO_TIME_LIMIT = 30;         // 한 명 사망 후 제한 시간 30초
 const EMERGENCY_BETRAYAL_TIME = 30; // 부활 후 배신 타이머 30초
@@ -16,8 +16,8 @@ const BOOST_DURATION = 150;
 const STEEL_TAIL_DURATION = 150;
 
 const ZOMBIE_COUNT = 6;
-const ZOMBIE_SPEED_NORMAL = 4.2;    // 하향 조정 (기본 5.5)
-const ZOMBIE_SPEED_BOOSTED = 8.5;   // 하향 조정 (기본 11)
+const ZOMBIE_SPEED_NORMAL = 4.2;    
+const ZOMBIE_SPEED_BOOSTED = 8.5;   
 const ZOMBIE_BLOOD_DURATION = 150;
 const ZOMBIE_RANDOM_CHANCE = 0.03;
 
