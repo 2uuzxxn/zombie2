@@ -158,6 +158,6 @@ function mousePressed() {
   const cx=CANVAS_W/2, cy=CANVAS_H/2;
   if (phase===PHASE_END &&
       mouseX>cx-80&&mouseX<cx+80&&mouseY>cy+58&&mouseY<cy+96) { resetGame(); }
-  if (phase===PHASE_LOBBY &&
+  if (phase===PHBY &&
       mouseX>cx-100&&mouseX<cx+100&&mouseY>cy+80&&mouseY<cy+126) { phase=PHASE_COOP; }
 }
