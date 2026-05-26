@@ -27,14 +27,6 @@ function resetGame() {
   phase = PHASE_LOBBY;
 }
 
-// ⭐ 1단계 통과 후 2단계 전장으로 넘어가는 레벨 업 기능 추가
-function startLevel2() {
-  currentLevel = 2;
-  resetGame();
-  phase = PHASE_COOP;
-  showNotification('A', '★ 1단계 성공! 2단계 하드코어 재앙 전장에 진입합니다! ★', '#FFD600');
-}
-
 function draw() {
   background(COLOR_EMPTY);
 
@@ -50,7 +42,7 @@ function draw() {
   gameTimer--;
   const timeLeftSec = gameTimer / FRAME_RATE;
 
-  // ⭐ 핵심 수정: 30초가 남는 순간 배신 페이즈 트리거 연동
+  // 남은 시간이 30초 이하가 되는 순간 배신 페이즈 트리거 작동
   if (!betrayalTriggered && timeLeftSec <= BETRAYAL_TRIGGER_TIME) {
     _triggerBetrayal();
   }
@@ -74,14 +66,7 @@ function draw() {
   playerA.draw(this); playerB.draw(this);
   drawBetrayalAnnounce(this);
   
-  // UI 드로잉 연동 시 단계 정보를 시각적으로 확인할 수 있게 텍스트 상단 보강
   drawUI(this, phase, timeLeftSec, countTiles());
-  
-  // HUD 텍스트에 단계 표기 추가
-  push();
-  fill(255); textSize(11); textAlign(LEFT, TOP);
-  text(`LEVEL: ${currentLevel}`, 12, 45);
-  pop();
 }
 
 function _triggerBetrayal() {
@@ -98,17 +83,6 @@ function _triggerBetrayal() {
 }
 
 function _checkEndConditions(timeLeftSec) {
-  const counts = countTiles();
-  const totalTiles = ROWS * COLS;
-
-  // ⭐ [1단계 전용 클리어 판정]: 70% 이상 채웠을 때 자동 2단계 워프
-  if (currentLevel === 1 && phase === PHASE_COOP) {
-    if (counts.team / totalTiles >= 0.7) {
-      startLevel2();
-      return;
-    }
-  }
-
   if (gameTimer <= 0) { _endGame('timer'); return; }
   if (!playerA.alive && !playerB.alive) { _endGame('both_dead'); return; }
 
@@ -176,7 +150,7 @@ function _endGame(reason) {
 
 function keyPressed() {
   if (phase === PHASE_LOBBY && keyCode === 32) { phase = PHASE_COOP; return; }
-  if (phase === PHASE_END && (key==='r'||key==='R')) { currentLevel = 1; resetGame(); return; }
+  if (phase === PHASE_END && (key==='r'||key==='R')) { resetGame(); return; }
   if (phase===PHASE_COOP || phase===PHASE_SOLO || phase===PHASE_BETRAYAL) {
     playerA.handleKeyPressed(keyCode);
     playerB.handleKeyPressed(keyCode);
@@ -186,7 +160,7 @@ function keyPressed() {
 function mousePressed() {
   const cx=CANVAS_W/2, cy=CANVAS_H/2;
   if (phase===PHASE_END &&
-      mouseX>cx-80&&mouseX<cx+80&&mouseY>cy+58&&mouseY<cy+96) { currentLevel = 1; resetGame(); }
+      mouseX>cx-80&&mouseX<cx+80&&mouseY>cy+58&&mouseY<cy+96) { resetGame(); }
   if (phase===PHASE_LOBBY &&
       mouseX>cx-100&&mouseX<cx+100&&mouseY>cy+80&&mouseY<cy+126) { phase=PHASE_COOP; }
 }
