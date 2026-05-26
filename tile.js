@@ -1,6 +1,3 @@
-// tile.js — 랜덤 박스 3종 (게임 시작 시 맵에 고정 배치)
-// 박스 크기: 픽셀 4칸 (2x2 타일) → 플레이어가 근처 2칸 이내면 획득
-
 let boxes = [];
 
 function initTiles(p) {
@@ -18,9 +15,7 @@ function _placeBoxes(p) {
       attempts++;
       const r = Math.floor(p.random(5, ROWS-5));
       const c = Math.floor(p.random(5, COLS-5));
-      // 시작 중앙 영역 근처 제외
       if (Math.abs(r-midR) < 7 && Math.abs(c-midC) < 9) continue;
-      // 다른 박스와 최소 4타일 간격
       if (boxes.some(b => Math.abs(b.r-r) < 4 && Math.abs(b.c-c) < 4)) continue;
       boxes.push({ r, c, type });
       placed++;
@@ -32,10 +27,9 @@ function updateTiles(p) {}
 
 function drawTiles(p) {
   for (const box of boxes) {
-    // 박스를 2x2 타일 크기(픽셀 4칸)로 그리기
     const x = box.c * TILE_SIZE - TILE_SIZE/2;
     const y = box.r * TILE_SIZE - TILE_SIZE/2;
-    const size = TILE_SIZE * 2; // 2배 크기
+    const size = TILE_SIZE * 2; 
     const blink = Math.sin(p.frameCount * 0.12) > 0;
 
     p.noStroke();
@@ -46,7 +40,6 @@ function drawTiles(p) {
     }
     p.rect(x+1, y+1, size-2, size-2, 6);
 
-    // 아이콘 (2배 크기에 맞게)
     p.textAlign(p.CENTER, p.CENTER);
     p.textSize(16);
     p.fill(255);
@@ -60,12 +53,11 @@ function drawTiles(p) {
   }
 }
 
-// 플레이어가 박스 중심 2칸 이내면 획득 (넉넉한 판정)
 function checkTilePickup(player, zombiesArr, phase, p) {
   for (let i = boxes.length-1; i >= 0; i--) {
     const box = boxes[i];
     const dist = Math.abs(box.r - player.r) + Math.abs(box.c - player.c);
-    if (dist <= 1) { // 1타일 이내면 획득
+    if (dist <= 1) { 
       _applyBoxEffect(box, player, phase, p);
       boxes.splice(i, 1);
     }
