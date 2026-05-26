@@ -36,7 +36,7 @@ class Zombie {
     let targetR = this.r;
     let targetC = this.c;
 
-    // 꼬리가 6칸 이상 길어지면 귀환 본능 작동
+    // 꼬리가 6칸 이상 길어지면 귀환 본능 작동 (집으로 돌아가 영토 넓히기)
     if (this.tail.length >= 6) {
       let minHomeDist = Infinity;
       for (let r = 0; r < ROWS; r++) {
@@ -114,22 +114,27 @@ class Zombie {
       return;
     }
 
+    // ⭐ 좀비 땅 확장 처리 정상화: 이동 전 칸을 꼬리로 기록하고, 소유지에 들어가면 채우기
     const isOnOwned = getOwner(this.r, this.c) === OWNER_ZOMBIE;
     if (isOnOwned) {
       if (this.tail.length > 0) {
         const tailSet = new Set(this.tail.map(t => `${t.r},${t.c}`));
-        floodFillEnclosed(tailSet, OWNER_ZOMBIE, p);
+        floodFillEnclosed(tailSet, OWNER_ZOMBIE, p); // 꼬리 내부를 좀비 영토로 전형
         this.tail = [];
       }
     } else {
       this.tail.push({ r: this.r, c: this.c });
     }
 
+    // ⭐ 좀비가 플레이어의 꼬리를 밟았을 때 죽이는 로직 수정
     for (const pl of players) {
       if (!pl.alive) continue;
       const hitIdx = pl.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
-        pl._cutTailAt(nr, nc);
+        // 플레이어가 무적(강철꼬리) 상태가 아닐 때만 죽임
+        if (pl.steelTailTimer <= 0) {
+          pl._cutTailAt(nr, nc);
+        }
       }
     }
 
@@ -137,9 +142,11 @@ class Zombie {
     this.c = nc;
   }
 
+  // 플레이어가 좀비 꼬리를 밟았을 때 좀비가 죽는 로직
   cutTailAt(r, c) {
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
+      // 좀비가 맵에 그려놓은 꼬리 타일들을 다시 빈 공간으로 초기화
       for (let i = idx; i < this.tail.length; i++) {
         setOwner(this.tail[i].r, this.tail[i].c, OWNER_NONE);
       }
