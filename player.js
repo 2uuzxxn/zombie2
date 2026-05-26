@@ -80,7 +80,6 @@ class Player {
       this.tail.push({ r: this.r, c: this.c });
     }
 
-    // [에너지 버프 보강] 번개 모양 지속 시간 도중에는 본인 꼬리를 밟아도 안전
     if (this.tail.some(t => t.r === nr && t.c === nc)) {
       if (this.steelTailTimer <= 0) { this._die(); return; }
     }
@@ -91,17 +90,15 @@ class Player {
       return;
     }
 
-    // 배신 페이즈(PHASE_BETRAYAL)에서 상대방의 꼬리를 끊었을 때 (즉사 시스템 단일화)
+    // ⭐ 핵심 수정: 오직 배신 페이즈(PHASE_BETRAYAL)에서만 팀원의 꼬리를 끊어 죽일 수 있음!
     if (phase === PHASE_BETRAYAL && otherPlayer && otherPlayer.alive) {
       const hitIdx = otherPlayer.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
         if (otherPlayer.steelTailTimer > 0) {
-          // 상대방이 에너지 버프 상태(강철꼬리)라면 오히려 내가 튕겨 나감 (무적 보호)
           this.nextDr = -this.dr;
           this.nextDc = -this.dc;
           return;
         } else {
-          // 에너지 버프가 없다면 단판 즉사 데스매치 룰 적용
           otherPlayer._cutTailAt(nr, nc);
         }
       }
@@ -115,7 +112,7 @@ class Player {
         return;
       }
       if (z.tail.some(t => t.r === nr && t.c === nc)) {
-        z.cutTailAt(nr, nc, this.id, phase); 
+        z.cutTailAt(nr, nc);
         break;
       }
     }
@@ -125,9 +122,6 @@ class Player {
   }
 
   _cutTailAt(r, c) {
-    // 번개 에너지 버프 가동 중에는 외부 충격(좀비, 적)으로 꼬리가 밟혀도 절대 죽지 않음!
-    if (this.steelTailTimer > 0) return;
-
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
       for (let i = idx; i < this.tail.length; i++) {
@@ -162,24 +156,24 @@ class Player {
     p.noStroke();
     for (const t of this.tail) {
       p.fill(tailCol);
-      p.rect(t.c*TILE_SIZE+2, t.r*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4, 1);
+      p.rect(t.c*TILE_SIZE+3, t.r*TILE_SIZE+3, TILE_SIZE-6, TILE_SIZE-6, 2);
     }
     const x = this.c*TILE_SIZE, y = this.r*TILE_SIZE;
     if (this.boostTimer > 0) {
       p.fill(0, 230, 230, 60); p.noStroke();
-      p.rect(x-2, y-2, TILE_SIZE+4, TILE_SIZE+4, 4);
+      p.rect(x-3, y-3, TILE_SIZE+6, TILE_SIZE+6, 6);
     }
     if (this.bombFlash > 0 && Math.floor(p.frameCount/3) % 2 === 0) {
       p.fill(255, 200, 0, 120); p.noStroke();
-      p.rect(x-3, y-3, TILE_SIZE+6, TILE_SIZE+6, 4);
+      p.rect(x-4, y-4, TILE_SIZE+8, TILE_SIZE+8, 6);
     }
     p.fill(this.displayColor); p.noStroke();
-    p.rect(x+1, y+1, TILE_SIZE-2, TILE_SIZE-2, 3);
-    p.fill(255); p.textAlign(p.CENTER, p.CENTER); p.textSize(8);
+    p.rect(x+1, y+1, TILE_SIZE-2, TILE_SIZE-2, 5);
+    p.fill(255); p.textAlign(p.CENTER, p.CENTER); p.textSize(10);
     p.text(this.id, x+TILE_SIZE/2, y+TILE_SIZE/2);
     if (this.steelTailTimer > 0) {
-      p.fill(255,255,255,200); p.textSize(6);
-      p.text('⚙', x+TILE_SIZE-3, y+3);
+      p.fill(255,255,255,200); p.textSize(7);
+      p.text('⚙', x+TILE_SIZE-4, y+4);
     }
   }
 }
@@ -189,10 +183,10 @@ let playerA, playerB;
 function initPlayers() {
   const midR = Math.floor(ROWS/2);
   const midC = Math.floor(COLS/2);
-  playerA = new Player('A', midR, midC-4, 87, 83, 65, 68, 0, -1);
-  playerB = new Player('B', midR, midC+4, 38, 40, 37, 39, 0,  1);
+  playerA = new Player('A', midR, midC-2, 87, 83, 65, 68, 0, -1);
+  playerB = new Player('B', midR, midC+2, 38, 40, 37, 39, 0,  1);
 
-  for (let r = midR-3; r <= midR+3; r++)
-    for (let c = midC-6; c <= midC+6; c++)
+  for (let r = midR-2; r <= midR+2; r++)
+    for (let c = midC-4; c <= midC+4; c++)
       setOwner(r, c, OWNER_TEAM);
 }
