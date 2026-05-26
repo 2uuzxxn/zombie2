@@ -16,7 +16,6 @@ function drawUI(p, phase, timeLeft, counts) {
   const totalTiles = ROWS * COLS;
   const barX = 10, barY = 26, barW = CANVAS_W-20, barH = 8;
 
-  // ── 영역 비율 바 ──
   p.fill(40); p.rect(barX, barY, barW, barH, 5);
   if (phase === PHASE_COOP || phase === PHASE_SOLO) {
     const w = Math.max(2, (counts.team / totalTiles) * barW);
@@ -32,7 +31,6 @@ function drawUI(p, phase, timeLeft, counts) {
     p.text(`B: ${counts.B}`, barX+barW, 14);
   }
 
-  // ── 타임바 ──
   const totalTime = (phase === PHASE_SOLO) ? SOLO_TIME_LIMIT
                   : (phase === PHASE_BETRAYAL || betrayalTriggered) ? EMERGENCY_BETRAYAL_TIME
                   : GAME_TOTAL_TIME;
@@ -45,7 +43,6 @@ function drawUI(p, phase, timeLeft, counts) {
   p.fill(barColor);
   p.rect(0, hudH, CANVAS_W * timeFraction, 5);
 
-  // ── 타이머 텍스트 ──
   const mins = Math.floor(timeLeft/60);
   const secs = Math.floor(timeLeft%60);
   const timeStr = `${mins}:${secs.toString().padStart(2,'0')}`;
@@ -61,7 +58,6 @@ function drawUI(p, phase, timeLeft, counts) {
     p.text(timeStr, CANVAS_W/2, 13);
   }
 
-  // ── 페이즈 라벨 ──
   p.textSize(9); p.textAlign(p.CENTER, p.BOTTOM);
   if (phase === PHASE_COOP)     { p.fill('#4CAF50'); p.text('[ 협력 페이즈 ]', CANVAS_W/2, 38); }
   else if (phase === PHASE_SOLO){ p.fill('#FF9800'); p.text('[ 한 명 사망 — 제한시간! ]', CANVAS_W/2, 38); }
@@ -156,11 +152,11 @@ function drawLobby(p) {
   p.fill(COLOR_A); p.text('플레이어 A: W A S D', cx-120, cy-72);
   p.fill(COLOR_B); p.text('플레이어 B: ↑ ↓ ← →', cx+120, cy-72);
   p.textSize(11); p.fill(160);
-  p.text('협력 페이즈 30초 → 배신 페이즈 30초', cx, cy-38);
+  p.text('협력 페이즈 40초 → 배신 페이즈 20초', cx, cy-38);
   p.text('상대 꼬리를 끊어야 죽음 / 머리끼리 부딪히면 밀려남', cx, cy-18);
   p.text('맵 밖으로 나갈 수 없음', cx, cy+2);
   p.fill(255,165,0);
-  p.text('💊 약: 보너스 땅   🩸 피: 좀비 가속   ⚡ 에너지드링크: 속도2배 + 절대무적', cx, cy+32);
+  p.text('💊 약: 보너스 땅   🩸 피: 좀비 가속   ⚡ 에너지드링크: 속도2배+강철꼬리', cx, cy+32);
   p.fill(180); p.text('좀비 꼬리를 밟으면 좀비가 죽습니다!', cx, cy+52);
   const blink = Math.floor(p.frameCount/20)%2===0;
   p.fill(blink?'#4CAF50':'#2E7D32'); p.noStroke();
