@@ -15,7 +15,7 @@ class Zombie {
     
     this.patrolTarget = null;
     this.patrolTimer = 0;
-    this.spawnOriginR = r; // 정화 보상용 기지 추적 좌표 저장
+    this.spawnOriginR = r; 
     this.spawnOriginC = c;
   }
 
@@ -125,16 +125,14 @@ class Zombie {
       this.tail.push({ r: this.r, c: this.c });
     }
 
-    // ⭐ [2단계 고유 기능] 좀비 오염 패시브: 움직이기만 해도 지나간 자리가 실시간 좀비 땅화
-    if (currentLevel === 2) {
-      setOwner(nr, nc, OWNER_ZOMBIE);
-    }
+    // 지나다니며 실시간 땅 오염 패시브 결합
+    setOwner(nr, nc, OWNER_ZOMBIE);
 
     for (const pl of players) {
       if (!pl.alive) continue;
       const hitIdx = pl.tail.findIndex(t => t.r === nr && t.c === nc);
       if (hitIdx !== -1) {
-        pl._cutTailAt(nr, nc);
+        pl._cutTailAt(nr, nc); // 플레이어 꼬리 자르기 호출 (내부에서 무적 판정 제어)
       }
     }
 
@@ -142,7 +140,6 @@ class Zombie {
     this.c = nc;
   }
 
-  // ⭐ 핵심 수정: 좀비 사냥 시 클리어 단계 보상 연동
   cutTailAt(r, c, killerId, phase) {
     const idx = this.tail.findIndex(t => t.r === r && t.c === c);
     if (idx !== -1) {
@@ -151,16 +148,14 @@ class Zombie {
       }
       this.tail.splice(idx);
 
-      // [1단계 보상] 좀비를 잡으면 그 좀비의 2x2 오리진 영토를 아군 땅으로 흡수 정화!
-      if (currentLevel === 1) {
-        const rewardOwner = phase === PHASE_COOP ? OWNER_TEAM : (killerId === 'A' ? OWNER_A : OWNER_B);
-        for (let or = this.spawnOriginR; or < this.spawnOriginR + 2; or++) {
-          for (let oc = this.spawnOriginC; oc < this.spawnOriginC + 2; oc++) {
-            if (getOwner(or, oc) === OWNER_ZOMBIE) setOwner(or, oc, rewardOwner);
-          }
+      // 좀비 사냥 시 고유 스폰 영역 아군 땅으로 흡수 정화 기믹 고정
+      const rewardOwner = phase === PHASE_COOP ? OWNER_TEAM : (killerId === 'A' ? OWNER_A : OWNER_B);
+      for (let or = this.spawnOriginR; or < this.spawnOriginR + 2; or++) {
+        for (let oc = this.spawnOriginC; oc < this.spawnOriginC + 2; oc++) {
+          if (getOwner(or, oc) === OWNER_ZOMBIE) setOwner(or, oc, rewardOwner);
         }
-        showNotification(killerId, `좀비 퇴치! 보라색 스폰 영역을 아군 영역으로 정화했습니다!`, '#4CAF50');
       }
+      showNotification(killerId, `좀비 퇴치! 스폰 구역을 아군 영역으로 정화했습니다!`, '#4CAF50');
       this._die();
     }
   }
@@ -183,15 +178,14 @@ class Zombie {
     p.noStroke();
     p.fill(zombieBloodTimer > 0 ? p.color(200,0,0,160) : p.color(120,50,180,160));
     for (const t of this.tail) {
-      p.rect(t.c*TILE_SIZE+4, t.r*TILE_SIZE+4, TILE_SIZE-8, TILE_SIZE-8, 2);
+      p.rect(t.c*TILE_SIZE+2, t.r*TILE_SIZE+2, TILE_SIZE-4, TILE_SIZE-4, 1);
     }
     const x = this.c*TILE_SIZE, y = this.r*TILE_SIZE;
     p.fill(zombieBloodTimer > 0 ? '#E53935' : '#AB47BC');
-    p.noStroke();
-    p.rect(x+2, y+2, TILE_SIZE-4, TILE_SIZE-4, 4);
+    p.rect(x+1, y+1, TILE_SIZE-2, TILE_SIZE-2, 3);
     p.fill(255, 50, 50);
-    p.ellipse(x+6, y+7, 4, 4);
-    p.ellipse(x+12, y+7, 4, 4);
+    p.ellipse(x+4, y+5, 2, 2);
+    p.ellipse(x+8, y+5, 2, 2);
   }
 }
 
@@ -212,7 +206,7 @@ function initZombies() {
   zombieBloodTimer = 0;
   zombieSpawnTimer = 0;
   const pos = [
-    [3,3],[3,COLS-4],[ROWS-4,3],[ROWS-4,COLS-4],[ROWS/2|0,3],[3,COLS/2|0]
+    [3,3],[3,COLS-4],[ROWS-4,3],[ROWS-4,COLS-4],[Math.floor(ROWS/2),3],[3,Math.floor(COLS/2)]
   ];
   for (let i = 0; i < Math.min(ZOMBIE_COUNT, pos.length); i++) {
     const r = pos[i][0];
